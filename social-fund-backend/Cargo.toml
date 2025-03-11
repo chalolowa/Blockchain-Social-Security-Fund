@@ -1,0 +1,5 @@
+[workspace]
+members = [
+    "src/social-fund-backend-backend"
+]
+resolver = "2"
