@@ -1,4 +1,3 @@
-use ic_cdk_macros::update;
 use candid::Principal;
 use std::collections::HashMap;
 use std::cell::RefCell;
@@ -20,50 +19,60 @@ const INSURANCE_FEE: u8 = 2;
 pub fn apply_for_loan(amount: u64, user: Principal) -> Result<String, String> {
     LOANS.with(|l| {
         let mut loans = l.borrow_mut();
-        
         if loans.contains_key(&user) {
-            return Err("User already has an active loan.".to_string());
+            return Err("Active loan exists.".to_string());
         }
 
-        let insurance_cut = amount * INSURANCE_FEE as u64 / 100;
-        let loan_amount = amount - insurance_cut;
+        let insurance = amount * INSURANCE_FEE as u64 / 100;
+        let loan_amount = amount - insurance;
 
-        let new_loan = Loan {
+        // Check stable reserve
+        let _ = crate::fund::FUND.with(|f| {
+            let fund = f.borrow();
+            Ok(if fund.stable_reserve < loan_amount {
+                return Err("Insufficient stable reserve.".to_string());
+            })
+        });
+
+        // Update reserves
+        crate::fund::FUND.with(|f| {
+            let mut fund = f.borrow_mut();
+            fund.stable_reserve -= loan_amount;
+            fund.stable_reserve += insurance; // Add insurance
+            fund.total_fund = fund.ckbtc_reserve + fund.stable_reserve;
+        });
+
+        loans.insert(user, Loan {
             user,
             amount: loan_amount,
             status: "Active".to_string(),
-        };
-
-        loans.insert(user, new_loan);
-
-        crate::fund::FUND.with(|f| {
-            let mut fund = f.borrow_mut();
-            fund.stable_reserve += insurance_cut;
         });
 
-        Ok("Loan approved with insurance protection.".to_string())
+        Ok("Loan approved.".to_string())
     })
 }
 
-//repay loan
 pub fn repay_loan(amount: u64, user: Principal) -> Result<String, String> {
     LOANS.with(|l| {
         let mut loans = l.borrow_mut();
-        
-        if let Some(loan) = loans.get_mut(&user) {
-            if loan.amount < amount {
-                return Err("Repayment amount exceeds loan amount.".to_string());
+        match loans.get_mut(&user) {
+            Some(loan) => {
+                if loan.amount < amount {
+                    return Err("Overpayment.".to_string());
+                }
+                loan.amount -= amount;
+                // Add repayment to stable reserve
+                crate::fund::FUND.with(|f| {
+                    let mut fund = f.borrow_mut();
+                    fund.stable_reserve += amount;
+                    fund.total_fund = fund.ckbtc_reserve + fund.stable_reserve;
+                });
+                if loan.amount == 0 {
+                    loans.remove(&user);
+                }
+                Ok("Repayment successful.".to_string())
             }
-            
-            loan.amount -= amount;
-            
-            if loan.amount == 0 {
-                loans.remove(&user);
-            }
-            
-            Ok("Loan repayment successful.".to_string())
-        } else {
-            Err("No active loan found.".to_string())
+            None => Err("No active loan.".to_string()),
         }
     })
 }

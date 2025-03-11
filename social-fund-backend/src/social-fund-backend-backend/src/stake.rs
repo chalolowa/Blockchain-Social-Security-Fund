@@ -1,4 +1,3 @@
-use ic_cdk_macros::update;
 use std::cell::RefCell;
 
 thread_local! {

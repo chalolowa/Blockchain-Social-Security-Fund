@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use candid::Principal;
-use ic_cdk_macros::{update, query};
 
 type ProposalId = u64;
 
@@ -83,22 +82,19 @@ fn create_proposal(description: String) -> ProposalId {
 const REWARD_PER_VOTE: u64 = 10;
 
 //claim rewards
-
 pub fn redeem_rewards(user: Principal) -> Result<String, String> {
     REWARDS.with(|r| {
         let mut rewards = r.borrow_mut();
         let amount = rewards.remove(&user).unwrap_or(0);
-
-        if amount > 0 {
-            crate::fund::FUND.with(|f| {
-                let mut fund = f.borrow_mut();
-                fund.total_fund += amount;
-            });
-
-            Ok(format!("Redeemed {} governance rewards.", amount))
-        } else {
-            Err("No rewards to redeem.".to_string())
+        if amount == 0 {
+            return Err("No rewards.".to_string());
         }
+        crate::fund::FUND.with(|f| {
+            let mut fund = f.borrow_mut();
+            fund.stable_reserve += amount;
+            fund.total_fund = fund.ckbtc_reserve + fund.stable_reserve;
+        });
+        Ok(format!("Redeemed {} rewards.", amount))
     })
 }
 

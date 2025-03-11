@@ -89,3 +89,9 @@ fn apply_interest() {
 fn repay_loan(amount: u64, user: Principal) -> Result<String, String> {
     loans::repay_loan(amount, user)
 }
+
+///repay ckBTC loan
+#[update]
+fn repay_ckbtc(amount: u64, user: Principal) -> Result<String, String> {
+    ckbtc::repay_ckbtc(amount, user)
+}

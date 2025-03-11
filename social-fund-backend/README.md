@@ -11,8 +11,6 @@ This is the backend implementation for a decentralized social security fund on I
 Ensure you have **DFX (ICP SDK)** and **Rust** installed:
 
 ```sh
-Copy
-Edit
 dfx --version  # Should be installed
 cargo --version  # Rust should be installed
 ```
