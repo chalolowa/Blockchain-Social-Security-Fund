@@ -31,7 +31,7 @@ fn get_fund_info() -> fund::FundInfo {
     fund::get_fund_info()
 }
 
-/// Employee contributes to the fund (80% in ckBTC, 20% in stable reserve)
+/// Employee contributes to the fund (50% in ckBTC, 50% in stable reserve)
 #[update]
 fn contribute(amount: u64, user: Principal) {
     if !is_authenticated(user) {
@@ -134,18 +134,6 @@ fn repay_ckbtc(amount: u64, user: Principal) -> Result<String, String> {
         ic_cdk::trap("User not authenticated.");
     }
     ckbtc::repay_ckbtc(amount, user)
-}
-
-/// Store File on IPFS
-#[update]
-fn store_file(ipfs_hash: String, is_public: bool) -> Result<String, String> {
-    ipfs::store_file(ipfs_hash, is_public)
-}
-
-/// Retrieve File from IPFS
-#[query]
-fn get_file(ipfs_hash: String) -> Result<ipfs::FileRecord, String> {
-    ipfs::get_file(ipfs_hash)
 }
 
 /// Get all transactions
