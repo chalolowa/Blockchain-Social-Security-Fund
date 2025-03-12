@@ -1,6 +1,7 @@
 use candid::Principal;
 use std::collections::HashMap;
 use std::cell::RefCell;
+use crate::transactions::log_transaction;
 
 #[derive(Clone)]
 pub struct Loan {
@@ -48,6 +49,7 @@ pub fn apply_for_loan(amount: u64, user: Principal) -> Result<String, String> {
             status: "Active".to_string(),
         });
 
+        log_transaction(user, "Loan", loan_amount);
         Ok("Loan approved.".to_string())
     })
 }
@@ -70,6 +72,7 @@ pub fn repay_loan(amount: u64, user: Principal) -> Result<String, String> {
                 if loan.amount == 0 {
                     loans.remove(&user);
                 }
+                log_transaction(user, "Loan Repayment", amount);
                 Ok("Repayment successful.".to_string())
             }
             None => Err("No active loan.".to_string()),

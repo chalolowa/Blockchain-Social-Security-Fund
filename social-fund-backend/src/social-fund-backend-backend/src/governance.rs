@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use candid::Principal;
+use crate::transactions::log_transaction;
 
 type ProposalId = u64;
 
@@ -94,6 +95,7 @@ pub fn redeem_rewards(user: Principal) -> Result<String, String> {
             fund.stable_reserve += amount;
             fund.total_fund = fund.ckbtc_reserve + fund.stable_reserve;
         });
+        log_transaction(user, "Redeem Rewards", amount);
         Ok(format!("Redeemed {} rewards.", amount))
     })
 }

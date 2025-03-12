@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::cell::RefCell;
 use candid::Principal;
+use crate::transactions::log_transaction;
 
 thread_local! {
     static CKBTC_LOANS: RefCell<HashMap<Principal, u64>> = RefCell::new(HashMap::new());
@@ -28,6 +29,7 @@ pub fn borrow_ckbtc(amount: u64, user: Principal) -> Result<String, String> {
         l.borrow_mut().insert(user, amount);
     });
 
+    log_transaction(user, "Borrow ckBTC", amount);
     Ok("ckBTC loan issued.".to_string())
 }
 
@@ -49,6 +51,7 @@ pub fn repay_ckbtc(amount: u64, user: Principal) -> Result<String, String> {
                     fund.ckbtc_reserve += amount;
                     fund.total_fund = fund.ckbtc_reserve + fund.stable_reserve;
                 });
+                log_transaction(user, "Repay ckBTC", amount);
                 Ok("Repayment successful.".to_string())
             }
             None => Err("No active loan.".to_string()),

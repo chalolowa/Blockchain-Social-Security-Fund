@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use crate::transactions::log_transaction;
 
 thread_local! {
     static STABLE_YIELD_POOL: RefCell<u64> = RefCell::new(0); // Pool of stable assets for staking
@@ -17,6 +18,7 @@ pub fn stake_stable_assets(amount: u64) -> Result<String, String> {
         STABLE_YIELD_POOL.with(|pool| *pool.borrow_mut() += amount);
 
         ic_cdk::println!("Staked {} stable assets for yield.", amount);
+        log_transaction(ic_cdk::caller(), "Stake Stable Assets", amount);
         Ok("Stable assets staked successfully.".to_string())
     })
 }
@@ -34,6 +36,7 @@ pub fn collect_yield() {
         let mut fund = f.borrow_mut();
         fund.stable_reserve += yield_generated;
         fund.total_fund += yield_generated;
+        log_transaction(ic_cdk::caller(), "Collect Yield", yield_generated);
     });
 
     ic_cdk::println!("Reinvested {} into stable reserve.", yield_generated);
