@@ -105,7 +105,3 @@ The backend canister (written in Rust) provides the following critical functions
 - **Transaction logging functions are called internally by other actions (e.g., borrow, repay, redeem) to record each operation.**
 
 ---
-
-## Project Structure
-
-social-fund-backend/ ├── dfx.json ├── package.json ├── canisters/ │ ├── social_fund/ │ │ ├── src/ │ │ │ ├── lib.rs # Main canister logic, critical functions are exported here │ │ │ ├── ckbtc.rs # ckBTC integration functions │ │ │ ├── fund.rs # Fund management (contributions, withdrawals, interest) │ │ │ ├── loans.rs # Loan application and repayment logic │ │ │ ├── stake.rs # Staking and yield collection │ │ │ ├── governance.rs # Governance voting and rewards functions │ │ │ ├── user.rs # User profile functions (next of kin, roles) │ │ │ ├── nfid_auth.rs # NFID authentication functions │ │ │ ├── transactions.rs # Transaction logging │ │ ├── Cargo.toml │ │ └── social-fund-backend-backend.did # Candid interface definition (ensure this exists) ├── scripts/ │ ├── deploy.sh # Script to deploy canisters │ └── test.sh # Script for automated tests ├── declarations/ # Auto-generated declarations └── tests/
