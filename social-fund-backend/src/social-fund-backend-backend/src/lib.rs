@@ -25,6 +25,21 @@ fn is_authenticated(user: Principal) -> bool {
     nfid_auth::is_authenticated(user)
 }
 
+#[update]
+fn authenticate_with_details(
+    user: Principal,
+    role: String,
+    employee_details: Option<nfid_auth::EmployeeDetails>,
+    employer_details: Option<nfid_auth::EmployerDetails>
+) -> Result<nfid_auth::UserDetails, String> {
+    nfid_auth::authenticate_with_details(user, role, employee_details, employer_details)
+}
+
+#[update]
+fn logout(user: Principal) -> Result<String, String> {
+    nfid_auth::logout(user)
+}
+
 /// Get the fund's current status, including total balance and reserves
 #[query]
 fn get_fund_info() -> fund::FundInfo {
@@ -47,6 +62,12 @@ fn get_next_of_kin(user: Principal) -> Option<user::NextOfKin> {
 #[update]
 fn set_user_role(user: Principal, role: String) -> Result<String, String> {
     user::set_user_role(user, role)
+}
+
+/// Get the user's details
+#[query]
+fn get_authenticated_user(user: Principal) -> Option<nfid_auth::UserDetails> {
+    nfid_auth::get_authenticated_user(user)
 }
 
 /// Add a next of kin
@@ -98,7 +119,7 @@ fn employer_match(employee: Principal, amount: u64) {
     if !is_authenticated(employee) {
         ic_cdk::trap("User not authenticated.");
     }
-    fund::employer_match(employee, amount);
+    let _ =fund::employer_match(employee, amount);
 }
 
 /// Fund managers vote on governance proposals

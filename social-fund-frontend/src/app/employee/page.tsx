@@ -43,6 +43,11 @@ import {
 import { useAuth } from "@nfid/identitykit/react";
 import { toast } from "sonner";
 import background from "../../assets/backgroundark.jpg";
+import { Sidebar } from "@/components/Sidebar";
+import { PieChart, BarChart, User, LayoutDashboard, HandCoins, Scale } from "lucide-react";
+import { Bar, Pie } from "react-chartjs-2";
+import { Chart, registerables } from "chart.js";
+Chart.register(...registerables);
 
 export default function EmployeeDashboard() {
   const { user } = useAuth();
@@ -64,6 +69,43 @@ export default function EmployeeDashboard() {
   // State for governance
   const [proposalId, setProposalId] = useState<number>(0);
   const [voteApprove, setVoteApprove] = useState<boolean>(true);
+  const [activeItem, setActiveItem] = useState("overview");
+
+// Sidebar items configuration
+const sidebarItems = [
+  {
+    id: "profile",
+    label: "Profile Information",
+    icon: <User className="h-4 w-4" />
+  },
+  {
+    id: "overview",
+    label: "Overview",
+    icon: <LayoutDashboard className="h-4 w-4" />
+  },
+  {
+    id: "funds",
+    label: "Funds Management",
+    icon: <HandCoins className="h-4 w-4" />
+  },
+  {
+    id: "governance",
+    label: "Governance",
+    icon: <Scale className="h-4 w-4" />
+  }
+];
+
+// Chart data configuration
+const chartData = {
+  labels: ["ckBTC", "Stable Reserve"],
+  datasets: [
+    {
+      label: 'Asset Distribution',
+      data: [fundInfo?.ckbtc_reserve || 0, fundInfo?.stable_reserve || 0],
+      backgroundColor: ['#10B981', '#3B82F6'],
+    },
+  ],
+};
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -235,263 +277,92 @@ export default function EmployeeDashboard() {
     }
   };
 
-  if (isLoading) {
+
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500"></div>
-          <p className="mt-4 text-gray-600">Loading your dashboard...</p>
+      <div className="min-h-screen relative" style={{ backgroundImage: `url(${background.src})` }}>
+        <div className="absolute inset-0 bg-background/20" />
+        <div className="flex">
+          <Sidebar
+            className="w-[250px] border-r bg-background/95 backdrop-blur"
+            items={sidebarItems}
+            activeItem={activeItem}
+            setActiveItem={setActiveItem}
+            onLogout={handleLogout}
+          />
+          
+          <div className="flex-1 p-8">
+            {activeItem === "profile" && (
+              <Card>
+                <CardHeader>
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <User className="h-5 w-5" /> Profile Information
+                  </h3>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Existing profile form */}
+                </CardContent>
+              </Card>
+            )}
+    
+            {activeItem === "overview" && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <Card>
+                    <CardHeader>
+                      <h3 className="font-semibold flex items-center gap-2">
+                        <PieChart className="h-5 w-5" /> Asset Distribution
+                      </h3>
+                    </CardHeader>
+                    <CardContent>
+                      <Pie data={chartData} />
+                    </CardContent>
+                  </Card>
+                  
+                  <Card>
+                    <CardHeader>
+                      <h3 className="font-semibold flex items-center gap-2">
+                        <BarChart className="h-5 w-5" /> Contribution History
+                      </h3>
+                    </CardHeader>
+                    <CardContent>
+                      <Bar 
+                        data={{
+                          labels: transactionHistory.map(t => new Date(Number(t.timestamp) * 1000).toLocaleDateString()),
+                          datasets: [{
+                            label: 'Contributions',
+                            data: transactionHistory.map(t => Number(t.amount)),
+                            backgroundColor: '#10B981',
+                          }]
+                        }}
+                      />
+                    </CardContent>
+                  </Card>
+                </div>
+                
+                {/* Transaction History Tables */}
+              </div>
+            )}
+    
+            {activeItem === "funds" && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* ckBTC and Stable Reserve Cards */}
+              </div>
+            )}
+    
+            {activeItem === "governance" && (
+              <Card>
+                <CardHeader>
+                  <h3 className="font-semibold flex items-center gap-2">
+                    <Scale className="h-5 w-5" /> Governance
+                  </h3>
+                </CardHeader>
+                <CardContent>
+                  {/* Governance Section */}
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </div>
       </div>
     );
-  }
-
-  return (
-    <div className="min-h-screen relative" style={{
-      backgroundImage: `url(${background.src})`,
-      backgroundSize: "cover",
-      backgroundPosition: "center",
-    }}>
-      <div className="absolute inset-0 bg-background/20" />
-      <div className="relative container mx-auto max-w-7xl py-8 px-4">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Employee Portal</h1>
-          <div className="flex items-center gap-4">
-            <Switch 
-              checked={isEmployerView}
-              onCheckedChange={setIsEmployerView}
-            />
-            <span className="text-sm">Employer View</span>
-          </div>
-        </div>
-
-        {/* Balance Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          <Card>
-            <CardHeader>
-              <h3 className="font-semibold">Your Holdings</h3>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span>ckBTC Reserve</span>
-                  <Badge variant="outline">{fundInfo?.ckbtc_reserve} ckBTC</Badge>
-                </div>
-                <div className="flex justify-between">
-                  <span>Stable Reserve</span>
-                  <Badge variant="outline">${fundInfo?.stable_reserve}</Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Governance Section */}
-          <Card className="lg:col-span-2">
-            <CardHeader>
-              <h3 className="font-semibold">Governance & Rewards</h3>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-col sm:flex-row items-center gap-4">
-                <Button onClick={handleClaimRewards} className="bg-yellow-500 text-white px-4 py-2 rounded">
-                  Claim Rewards
-                </Button>
-                <span>Your Rewards: {rewards}</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Input
-                  type="number"
-                  placeholder="Proposal ID"
-                  value={proposalId}
-                  onChange={(e) => setProposalId(Number(e.target.value))}
-                />
-                <Select onValueChange={(value) => setVoteApprove(value === "approve")}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Vote" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="approve">Approve</SelectItem>
-                    <SelectItem value="reject">Reject</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button onClick={handleVote} className="bg-red-500 text-white px-4 py-2 rounded">
-                  Submit Vote
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Financial Actions Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* ckBTC Actions */}
-          <Card>
-            <CardHeader>
-              <h3 className="font-semibold">ckBTC Actions</h3>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Amount (ckBTC)</Label>
-                  <Input
-                    type="number"
-                    value={ckbtcAmount}
-                    onChange={(e) => setCkbtcAmount(Number(e.target.value))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Action</Label>
-                  <Select onValueChange={(value) => setCkbtcAction(value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select action" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="withdraw">Withdraw ckBTC</SelectItem>
-                      <SelectItem value="borrow">Borrow ckBTC</SelectItem>
-                      <SelectItem value="repay">Repay ckBTC</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <Button onClick={handleCkbtcAction} className="w-full">
-                Confirm ckBTC Action
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Stable Reserve Actions */}
-          <Card>
-            <CardHeader>
-              <h3 className="font-semibold">Stable Reserve Actions</h3>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Amount (Stable)</Label>
-                  <Input
-                    type="number"
-                    value={stableAmount}
-                    onChange={(e) => setStableAmount(Number(e.target.value))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Action</Label>
-                  <Select onValueChange={(value) => setStableAction(value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select action" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="apply_loan">Apply for Loan</SelectItem>
-                      <SelectItem value="repay_loan">Repay Loan</SelectItem>
-                      <SelectItem value="stake">Stake Stable</SelectItem>
-                      <SelectItem value="collect_yield">Collect Yield</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <Button onClick={handleStableAction} className="w-full">
-                Confirm Stable Action
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Beneficiary Information */}
-        <div className="mb-6">
-          <Card>
-            <CardHeader>
-              <h3 className="font-semibold">Beneficiary Information</h3>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Input
-                placeholder="Name"
-                value={nextOfKin.name}
-                onChange={(e) => setNextOfKin({ ...nextOfKin, name: e.target.value })}
-              />
-              <Input
-                placeholder="Relationship"
-                value={nextOfKin.relation}
-                onChange={(e) => setNextOfKin({ ...nextOfKin, relation: e.target.value })}
-              />
-              <Input
-                placeholder="Contact Info"
-                value={nextOfKin.contact}
-                onChange={(e) => setNextOfKin({ ...nextOfKin, contact: e.target.value })}
-              />
-              <Button onClick={handleAddNextOfKin} className="w-full">
-                Save Beneficiary
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Transaction History Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* ckBTC Transactions */}
-          <Card>
-            <CardHeader>
-              <h3 className="font-semibold">ckBTC Transactions</h3>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {ckbtcTransactions.map((tx) => (
-                    <TableRow key={tx.tx_id}>
-                      <TableCell>{tx.tx_type}</TableCell>
-                      <TableCell>{tx.amount}</TableCell>
-                      <TableCell>{new Date(tx.timestamp * 1000).toLocaleDateString()}</TableCell>
-                      <TableCell>
-                        <Badge variant={tx.status === "completed" ? "default" : "secondary"}>
-                          {tx.status}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-          {/* Stable Reserve Transactions */}
-          <Card>
-            <CardHeader>
-              <h3 className="font-semibold">Stable Reserve Transactions</h3>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {stableTransactions.map((tx) => (
-                    <TableRow key={tx.tx_id}>
-                      <TableCell>{tx.tx_type}</TableCell>
-                      <TableCell>{tx.amount}</TableCell>
-                      <TableCell>{new Date(tx.timestamp * 1000).toLocaleDateString()}</TableCell>
-                      <TableCell>
-                        <Badge variant={tx.status === "completed" ? "default" : "secondary"}>
-                          {tx.status}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    </div>
-  );
 }

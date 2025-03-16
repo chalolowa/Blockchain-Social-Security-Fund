@@ -38,7 +38,7 @@ export const getNextOfKin = async (user: string) => {
 export const setUserRole = async (role: string, user: string) => {
     const userPrincipal = Principal.fromText(user);
     return await backend.set_user_role(userPrincipal, role);
-};
+}
 
 export const getUserRole = async (user: string) => {
     const userPrincipal = Principal.fromText(user);
@@ -112,20 +112,32 @@ export interface UserDetails {
     employer_details: EmployerDetails | null;
 }
 
-export const authenticate_with_details = async (
-    principal: string,
-    role: string,
-    employee_details: EmployeeDetails | null,
-    employer_details: EmployerDetails | null
+export const authenticateWithDetails = async (
+  principal: string,
+  role: string,
+  employee_details: EmployeeDetails | null,
+  employer_details: EmployerDetails | null
 ): Promise<UserDetails> => {
-    const userPrincipal = Principal.fromText(principal);
-    const response = await backend.authenticate_with_details(
-        userPrincipal,
-        role,
-        employee_details,
-        employer_details
-    );
-    return response as unknown as UserDetails;
+  const userPrincipal = Principal.fromText(principal);
+  const response = await backend.authenticate_with_details(
+      userPrincipal,
+      role,
+      employee_details ? [employee_details] : [],
+      employer_details ? [employer_details] : []
+  ) as {
+      user_principal: Principal;
+      role: string;
+      authenticated_at: bigint;
+      employee_details: EmployeeDetails[];
+      employer_details: EmployerDetails[];
+  };
+  return {
+      principal: response.user_principal.toText(),
+      role: response.role,
+      authenticated_at: response.authenticated_at,
+      employee_details: response.employee_details[0] || null,
+      employer_details: response.employer_details[0] || null
+  };
 };
 
 export const getAuthenticatedUser = async (principal: string) => {

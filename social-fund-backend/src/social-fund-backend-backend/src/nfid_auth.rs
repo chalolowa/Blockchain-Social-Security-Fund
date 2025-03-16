@@ -39,7 +39,7 @@ fn icrc28_trusted_origins() -> Icrc28TrustedOriginsResponse {
 
 #[derive(CandidType, Deserialize, Clone, Debug)]
 pub struct UserDetails {
-    pub principal: Principal,
+    pub user_principal: Principal,
     pub role: String,
     pub authenticated_at: u64,
     pub employee_details: Option<EmployeeDetails>,
@@ -65,7 +65,6 @@ thread_local! {
 }
 
 // Authenticate User with Details
-#[update]
 pub fn authenticate_with_details(
     user: Principal,
     role: String,
@@ -74,7 +73,7 @@ pub fn authenticate_with_details(
 ) -> Result<UserDetails, String> {
     let now = ic_cdk::api::time();
     let user_details = UserDetails {
-        principal: user,
+        user_principal: user,
         role: role.clone(),
         authenticated_at: now,
         employee_details,
@@ -90,19 +89,24 @@ pub fn authenticate_with_details(
 }
 
 // Check Authentication Status and Get User Details
-#[query]
 pub fn get_authenticated_user(user: Principal) -> Option<UserDetails> {
     AUTHENTICATED_USERS.with(|auth| auth.borrow().get(&user).cloned())
 }
 
 // Check if User is Authenticated
-#[query]
 pub fn is_authenticated(user: Principal) -> bool {
     AUTHENTICATED_USERS.with(|auth| auth.borrow().contains_key(&user))
 }
 
+pub fn authenticate(user: Principal) -> Result<String, String> {
+    if is_authenticated(user) {
+        Ok("User already authenticated".to_string())
+    } else {
+        Ok("User authentication successful".to_string())
+    }
+}
+
 // Logout User
-#[update]
 pub fn logout(user: Principal) -> Result<String, String> {
     AUTHENTICATED_USERS.with(|auth| {
         let mut auth_map = auth.borrow_mut();

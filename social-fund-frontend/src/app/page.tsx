@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { useAuth } from "@nfid/identitykit/react";
 import { toast } from "sonner";
 import { useState } from "react";
-import { authenticate_with_details } from "@/services/icpService";
+import { authenticateWithDetails, isAuthenticated } from "@/services/icpService";
 
 export default function Home() {
   const router = useRouter();
@@ -20,29 +20,27 @@ export default function Home() {
         await connect();
       }
       
-      // If we have a user after connect, authenticate with backend
-      if (user) {
-        const userDetails = await authenticate_with_details(
-          user.principal.toText(),
-          "employee", // Default role, can be changed later
-          {
-            name: "",
-            position: "",
-            salary: 0
-          },
-          null
-        );
-        
-        // Store user details in localStorage for persistence
-        localStorage.setItem("userDetails", JSON.stringify(userDetails));
-        
-        // Redirect based on role
-        if (userDetails.role === "employer") {
-          router.push("/employer");
-        } else {
-          router.push("/employee");
-        }
+      // Check if already authenticated with backend
+      const isAuthed = await isAuthenticated(user?.principal.toText() || "");
+      if (isAuthed) {
+          router.push(user?.role === "employer" ? "/employer" : "/employee");
+          return;
       }
+
+      // Authenticate with default employee role
+      const userDetails = await authenticateWithDetails(
+          user?.principal.toText() || "",
+          "employee", 
+          null,  // No employee details initially
+          null   // No employer details
+      );
+      
+      // Store user details
+      localStorage.setItem("userDetails", JSON.stringify(userDetails));
+      
+      // Redirect based on role
+      router.push(userDetails.role === "employer" ? "/employer" : "/employee");
+
     } catch (error) {
       console.error("Failed to connect:", error);
       toast.error("Authentication failed. Please try again.");
@@ -80,7 +78,7 @@ export default function Home() {
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="bg-emerald-600 cursor-not-allowed hover:bg-emerald-700 text-white px-8 py-4 rounded-xl text-lg font-semibold transition-all"
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-xl text-lg font-semibold transition-all"
             onClick={handleConnect}
             disabled={isLoading}
           >

@@ -5,7 +5,7 @@ import { CheckCircleIcon, LockClosedIcon, CurrencyDollarIcon, UserGroupIcon } fr
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useAuth } from "@nfid/identitykit/react";
-import { authenticate_with_details } from "@/services/icpService";
+import { authenticateWithDetails, isAuthenticated } from "@/services/icpService";
 import { useState } from "react";
 
 export default function About() {
@@ -20,29 +20,26 @@ export default function About() {
         await connect();
       }
       
-      // If we have a user after connect, authenticate with backend
-      if (user) {
-        const userDetails = await authenticate_with_details(
-          user.principal.toText(),
-          "employee", // Default role, can be changed later
-          {
-            name: "",
-            position: "",
-            salary: 0
-          },
-          null
-        );
-        
-        // Store user details in localStorage for persistence
-        localStorage.setItem("userDetails", JSON.stringify(userDetails));
-        
-        // Redirect based on role
-        if (userDetails.role === "employer") {
-          router.push("/employer");
-        } else {
-          router.push("/employee");
-        }
+      // Check if already authenticated with backend
+      const isAuthed = await isAuthenticated(user?.principal.toText() || "");
+      if (isAuthed) {
+          router.push(user?.role === "employer" ? "/employer" : "/employee");
+          return;
       }
+
+      // Authenticate with default employee role
+      const userDetails = await authenticateWithDetails(
+          user?.principal.toText() || "",
+          "employee", 
+          null,  // No employee details initially
+          null   // No employer details
+      );
+      
+      // Store user details
+      localStorage.setItem("userDetails", JSON.stringify(userDetails));
+      
+      // Redirect based on role
+      router.push(userDetails.role === "employer" ? "/employer" : "/employee");
     } catch (error) {
       console.error("Failed to connect:", error);
       toast.error("Authentication failed. Please try again.");
