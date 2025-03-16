@@ -2,9 +2,9 @@ mod ckbtc;
 mod fund;
 mod loans;
 mod stake;
+mod user;
 mod governance;
 mod nfid_auth;
-mod ipfs;
 mod transactions;
 use candid::Principal;
 use ic_cdk_macros::{init, query, update};
@@ -29,6 +29,31 @@ fn is_authenticated(user: Principal) -> bool {
 #[query]
 fn get_fund_info() -> fund::FundInfo {
     fund::get_fund_info()
+}
+
+/// Get the user's role
+#[query]
+fn get_user_role(user: Principal) -> String {
+    user::get_user_role(user)
+}
+
+/// Get the user's next of kin
+#[query]
+fn get_next_of_kin(user: Principal) -> Option<user::NextOfKin> {
+    user::get_next_of_kin(user)
+}
+
+/// Set the user's role
+#[update]
+fn set_user_role(user: Principal, role: String) -> Result<String, String> {
+    user::set_user_role(user, role)
+}
+
+/// Add a next of kin
+#[update]
+fn add_next_of_kin(user: Principal, next_of_kin: user::NextOfKin) -> Result<String, String> {
+    user::add_next_of_kin(user, next_of_kin);
+    Ok("Next of kin added".to_string())
 }
 
 /// Employee contributes to the fund (50% in ckBTC, 50% in stable reserve)

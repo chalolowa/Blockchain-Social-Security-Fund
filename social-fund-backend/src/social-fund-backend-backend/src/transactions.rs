@@ -1,5 +1,4 @@
 use candid::{CandidType, Principal};
-use ic_cdk_macros::{query, update};
 use std::collections::HashMap;
 use std::cell::RefCell;
 use std::time::{SystemTime, UNIX_EPOCH};

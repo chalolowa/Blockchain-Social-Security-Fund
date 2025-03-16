@@ -37,21 +37,76 @@ fn icrc28_trusted_origins() -> Icrc28TrustedOriginsResponse {
     Icrc28TrustedOriginsResponse { trusted_origins }
 }
 
+#[derive(CandidType, Deserialize, Clone, Debug)]
+pub struct UserDetails {
+    pub principal: Principal,
+    pub role: String,
+    pub authenticated_at: u64,
+    pub employee_details: Option<EmployeeDetails>,
+    pub employer_details: Option<EmployerDetails>,
+}
+
+#[derive(CandidType, Deserialize, Clone, Debug)]
+pub struct EmployeeDetails {
+    pub name: String,
+    pub position: String,
+    pub salary: u64,
+}
+
+#[derive(CandidType, Deserialize, Clone, Debug)]
+pub struct EmployerDetails {
+    pub company_name: String,
+    pub registration_number: String,
+}
+
 // Authentication Map
 thread_local! {
-    static AUTHENTICATED_USERS: std::cell::RefCell<HashMap<Principal, bool>> = std::cell::RefCell::new(HashMap::new());
+    static AUTHENTICATED_USERS: std::cell::RefCell<HashMap<Principal, UserDetails>> = std::cell::RefCell::new(HashMap::new());
 }
 
-// Authenticate User
-pub fn authenticate(user: Principal) -> Result<String, String> {
+// Authenticate User with Details
+#[update]
+pub fn authenticate_with_details(
+    user: Principal,
+    role: String,
+    employee_details: Option<EmployeeDetails>,
+    employer_details: Option<EmployerDetails>,
+) -> Result<UserDetails, String> {
+    let now = ic_cdk::api::time();
+    let user_details = UserDetails {
+        principal: user,
+        role: role.clone(),
+        authenticated_at: now,
+        employee_details,
+        employer_details,
+    };
+
     AUTHENTICATED_USERS.with(|auth| {
         let mut auth_map = auth.borrow_mut();
-        auth_map.insert(user, true);
+        auth_map.insert(user, user_details.clone());
     });
-    Ok("User authenticated successfully.".to_string())
+
+    Ok(user_details)
 }
 
-// Check Authentication Status
+// Check Authentication Status and Get User Details
+#[query]
+pub fn get_authenticated_user(user: Principal) -> Option<UserDetails> {
+    AUTHENTICATED_USERS.with(|auth| auth.borrow().get(&user).cloned())
+}
+
+// Check if User is Authenticated
+#[query]
 pub fn is_authenticated(user: Principal) -> bool {
-    AUTHENTICATED_USERS.with(|auth| auth.borrow().get(&user).cloned().unwrap_or(false))
+    AUTHENTICATED_USERS.with(|auth| auth.borrow().contains_key(&user))
+}
+
+// Logout User
+#[update]
+pub fn logout(user: Principal) -> Result<String, String> {
+    AUTHENTICATED_USERS.with(|auth| {
+        let mut auth_map = auth.borrow_mut();
+        auth_map.remove(&user);
+    });
+    Ok("User logged out successfully.".to_string())
 }

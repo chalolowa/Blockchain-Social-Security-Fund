@@ -20,7 +20,7 @@ export default function RootLayout({
           authType="DELEGATION"
           signerClientOptions={{
             targets: [
-              "aaaaa-aa",
+              process.env.NEXT_PUBLIC_IC_CANISTER_ID || "",
             ],
           }}
         >

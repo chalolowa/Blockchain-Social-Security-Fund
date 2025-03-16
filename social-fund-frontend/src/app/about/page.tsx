@@ -5,22 +5,52 @@ import { CheckCircleIcon, LockClosedIcon, CurrencyDollarIcon, UserGroupIcon } fr
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useAuth } from "@nfid/identitykit/react";
+import { authenticate_with_details } from "@/services/icpService";
+import { useState } from "react";
 
 export default function About() {
   const router = useRouter();
   const {connect, user} = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleConnect = async () => {
     try {
-        if (!user) {
-            await connect();
+      setIsLoading(true);
+      if (!user) {
+        await connect();
+      }
+      
+      // If we have a user after connect, authenticate with backend
+      if (user) {
+        const userDetails = await authenticate_with_details(
+          user.principal.toText(),
+          "employee", // Default role, can be changed later
+          {
+            name: "",
+            position: "",
+            salary: 0
+          },
+          null
+        );
+        
+        // Store user details in localStorage for persistence
+        localStorage.setItem("userDetails", JSON.stringify(userDetails));
+        
+        // Redirect based on role
+        if (userDetails.role === "employer") {
+          router.push("/employer");
+        } else {
+          router.push("/employee");
         }
-        router.push("/dashboard");
+      }
     } catch (error) {
-        console.error("Failed to connect:", error);
-        toast("Authentication failed. Please try again.");
+      console.error("Failed to connect:", error);
+      toast.error("Authentication failed. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   }
+
   const features = [
     {
       icon: <CurrencyDollarIcon className="w-8 h-8 text-emerald-400" />,

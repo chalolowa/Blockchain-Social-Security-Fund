@@ -5,21 +5,49 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useAuth } from "@nfid/identitykit/react";
 import { toast } from "sonner";
-
+import { useState } from "react";
+import { authenticate_with_details } from "@/services/icpService";
 
 export default function Home() {
   const router = useRouter();
-  const {connect, user} = useAuth();
+  const { connect, user } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleConnect = async () => {
     try {
-        if (!user) {
-            await connect();
+      setIsLoading(true);
+      if (!user) {
+        await connect();
+      }
+      
+      // If we have a user after connect, authenticate with backend
+      if (user) {
+        const userDetails = await authenticate_with_details(
+          user.principal.toText(),
+          "employee", // Default role, can be changed later
+          {
+            name: "",
+            position: "",
+            salary: 0
+          },
+          null
+        );
+        
+        // Store user details in localStorage for persistence
+        localStorage.setItem("userDetails", JSON.stringify(userDetails));
+        
+        // Redirect based on role
+        if (userDetails.role === "employer") {
+          router.push("/employer");
+        } else {
+          router.push("/employee");
         }
-        router.push("/dashboard");
+      }
     } catch (error) {
-        console.error("Failed to connect:", error);
-        toast("Authentication failed. Please try again.");
+      console.error("Failed to connect:", error);
+      toast.error("Authentication failed. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   }
   
@@ -52,10 +80,21 @@ export default function Home() {
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-xl text-lg font-semibold transition-all"
+            className="bg-emerald-600 cursor-not-allowed hover:bg-emerald-700 text-white px-8 py-4 rounded-xl text-lg font-semibold transition-all"
             onClick={handleConnect}
+            disabled={isLoading}
           >
-            Get Started - It's Free
+             {isLoading ? (
+            <div className="flex items-center">
+              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Connecting...
+            </div>
+          ) : (
+            'Get started - it\'s free'
+          )}
           </motion.button>
           
           <motion.button
