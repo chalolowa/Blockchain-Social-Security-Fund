@@ -4,104 +4,76 @@ A decentralized social security fund built on the Internet Computer that provide
 
 ---
 
+## Architecture Overview
+
+graph TD
+    A[Frontend] --> B[ICP Canisters]
+    B --> C[ckBTC Ledger]
+    B --> D[NFID Auth]
+    A -->|Internet Identity| D
+    B --> E[Stablecoin Reserve]
+
+    subgraph ICP Canisters
+        B1[Fund Management]
+        B2[Loan System]
+        B3[Governance]
+        B4[Authentication]
+        B5[Transaction Ledger]
+    end
+
+---
+
 ## Overview
 
 This project aims to revolutionize social security by leveraging blockchain technology. It offers:
 
-- **Employee Dashboard:**  
-  - View ckBTC and stable reserve contributions.
-  - Perform financial actions: withdraw, borrow, repay ckBTC; apply for/repay loans.
-  - Manage beneficiary (next of kin) information.
-  - Participate in governance: vote on staking proposals and claim rewards.
-  - Collect yield from staking operations.
-  - Review transaction receipts and history (split between ckBTC and stable reserve transactions).
+1. Dual-Reserve Fund Mechanism
+-50/50 Allocation: Contributions split between ckBTC (80%) and USD stablecoins (20%)
 
-- **Employer Dashboard:**  
-  - View overall fund statistics.
-  - Contribute directly to employee wallets.
-  - Match employee contributions.
-  - Participate in governance: vote on staking proposals and claim governance rewards.
-  - View transaction receipts and history.
+-Dynamic Rebalancing: Automatic adjustment based on market conditions
 
-- **NFID Authentication:**  
-  - Secure login using NFID IdentityKit.
-  - Users can switch between employee and employer roles.
+-Collateralization: 150% over-collateralization for loans
 
-- **ICP Storage:**  
-  - All transaction logs and sensitive data are stored securely on the ICP canister (no external IPFS used).
+2. Hybrid Governance Model
+-Quadratic Voting: Prevent whale dominance in governance
+
+-Time-locked Proposals: Minimum 72-hour voting period
+
+-Delegated Voting: Employees can delegate voting power
+
+3. Risk Management System
+-Insurance Pool: 2% fee on all loans
+
+-Withdrawal Throttling: Tiered withdrawal limits based on fund health
 
 ---
 
-## Critical Backend Functions
+## Security Enhancements
 
-The backend canister (written in Rust) provides the following critical functions:
+1. Multi-Layered Authentication
 
-### Authentication
-- **`authenticate(user: Principal) -> Result<String, String>`**  
-  Authenticates the user using NFID.
+sequenceDiagram
+    User->>NFID: Initiate Auth
+    NFID->>ICP: Request Delegation
+    ICP->>Backend: Verify Principal
+    Backend->>User: Session Token + 2FA
 
-- **`is_authenticated(user: Principal) -> bool`**  
-  Checks whether a user is authenticated.
+2. Fund Protection Mechanisms
 
-### Fund Management
-- **`get_fund_info() -> FundInfo`**  
-  Returns the current fund status, including total funds, ckBTC reserve, stable reserve, and user contributions.
+Regular Audits: On-chain verification of fund balances
 
-- **`contribute(amount: u64, user: Principal)`**  
-  Allows an employee to contribute funds (50% allocated to ckBTC and 50% to stable reserves).
+---
 
-- **`request_withdrawal(amount: u64, user: Principal) -> Result<String, String>`**  
-  Enables withdrawal requests (subject to fund thresholds and withdrawal limits).
+## Environment Variables
 
-### Borrowing and Loans
-- **`borrow_ckbtc(amount: u64, user: Principal) -> Result<String, String>`**  
-  Processes decentralized Bitcoin (ckBTC) borrowing from the fund.
+### Frontend
 
-- **`repay_ckbtc(amount: u64, user: Principal) -> Result<String, String>`**  
-  Processes repayment of a ckBTC loan.
+NEXT_PUBLIC_NFID_APP_ID=your_nfid_app_id
+NEXT_PUBLIC_IC_HOST=<https://ic0.app>
 
-- **`apply_for_loan(amount: u64, user: Principal) -> Result<String, String>`**  
-  Allows employees to apply for a loan (insured using stable reserves).
+### Backend
 
-- **`repay_loan(amount: u64, user: Principal) -> Result<String, String>`**  
-  Enables employees to repay a loan.
-
-### Governance and Staking
-- **`vote_on_proposal(proposal_id: u64, approve: bool, voter: Principal) -> Result<String, String>`**  
-  Allows fund managers to vote on governance proposals regarding staking or fund management.
-
-- **`check_rewards(user: Principal) -> u64`**  
-  Returns the current governance rewards for the user.
-
-- **`redeem_rewards(user: Principal) -> Result<String, String>`**  
-  Allows users to claim their governance rewards directly to their wallet.
-
-- **`stake_stable_assets(amount: u64) -> Result<String, String>`**  
-  Enables staking of stable reserves to generate yield.
-
-- **`collect_yield() -> Result<String, String>`**  
-  Collects the yield generated from staked assets.
-
-- **`apply_interest() -> ()`**  
-  Applies monthly interest to all contributions.
-
-### User Profile and Role Management
-- **`add_next_of_kin(user: Principal, next_of_kin: NextOfKin) -> Result<String, String>`**  
-  Adds or updates beneficiary (next of kin) information for the user.
-
-- **`get_next_of_kin(user: Principal) -> Option<NextOfKin>`**  
-  Retrieves the next of kin details for the user.
-
-- **`set_user_role(user: Principal, role: String) -> Result<String, String>`**  
-  Sets the role (employee or employer) for the user.
-
-- **`get_user_role(user: Principal) -> String`**  
-  Retrieves the current role of the user.
-
-### Transaction Logging
-- **`get_transactions() -> Vec<Transaction>`**  
-  Returns a list of all transactions, which include details such as type, amount, timestamp, and status.
-  
-- **Transaction logging functions are called internally by other actions (e.g., borrow, repay, redeem) to record each operation.**
+FUND_THRESHOLD=100000000  # 1 BTC equivalent
+MAX_LOAN_RATIO=150        # 150% collateralization
 
 ---
