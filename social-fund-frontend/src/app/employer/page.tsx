@@ -73,7 +73,7 @@ const sidebarItems = [
         
         // Check if user is connected
         if (!user?.principal) {
-          return; // Wait for user to be connected instead of redirecting
+          return; 
         }
 
         // Verify authentication and role
@@ -176,7 +176,6 @@ const sidebarItems = [
         toast("Please fill all employee details");
         return;
       }
-      // API call to add employee would go here
       setEmployees([...employees, { ...newEmployee, id: employees.length + 1 }]);
       setNewEmployee({ name: "", position: "", salary: 0 }); // Reset form
       toast("Employee added successfully");
