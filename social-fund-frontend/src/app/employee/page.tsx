@@ -111,45 +111,47 @@ const chartData = {
     const checkAuth = async () => {
       try {
         setIsLoading(true);
-        if (!user) {
-          router.push('/');
+        
+        // Get stored user details first
+        const storedDetails = localStorage.getItem('userDetails');
+        if (!storedDetails) {
+          router.replace('/');
           return;
         }
 
-        // Get stored user details
-        const storedDetails = localStorage.getItem('userDetails');
-        if (storedDetails) {
-          const details = JSON.parse(storedDetails);
-          setUserDetails(details);
-          
-          // Verify authentication with backend
-          const isAuth = await isAuthenticated(user.principal.toText());
-          if (!isAuth) {
-            localStorage.removeItem('userDetails');
-            router.push('/');
-            return;
-          }
-
-          // If authenticated, fetch all necessary data
-          await Promise.all([
-            fetchFundInfo(),
-            fetchTransactions(),
-            fetchRewards()
-          ]);
-        } else {
-          router.push('/');
+        const details = JSON.parse(storedDetails);
+        
+        // Check if user is connected
+        if (!user?.principal) {
+          return; // Wait for user to be connected instead of redirecting
         }
+
+        // Verify authentication and role
+        const isAuth = await isAuthenticated(user.principal.toText());
+        if (!isAuth || details.role !== 'employee') {
+          localStorage.removeItem('userDetails');
+          router.replace('/');
+          return;
+        }
+
+        setUserDetails(details);
+
+        // If authenticated, fetch all necessary data
+        await Promise.all([
+          fetchFundInfo(),
+          fetchTransactions(),
+          fetchRewards()
+        ]);
       } catch (error) {
         console.error("Error checking authentication:", error);
         toast.error("Failed to verify authentication");
-        router.push('/');
       } finally {
         setIsLoading(false);
       }
     };
 
     checkAuth();
-  }, [user, router]);
+  }, [user]);
 
   async function fetchFundInfo() {
     try {
@@ -266,10 +268,10 @@ const chartData = {
 
   const handleLogout = async () => {
     try {
-      if (user) {
+      if (user?.principal) {
         await logout(user.principal.toText());
         localStorage.removeItem('userDetails');
-        router.push('/');
+        router.replace('/');
       }
     } catch (error) {
       console.error("Error logging out:", error);

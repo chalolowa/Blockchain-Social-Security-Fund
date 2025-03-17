@@ -21,8 +21,10 @@ export default function Home() {
           const authed = await isAuthenticated(user.principal.toText());
           if (authed) {
             const storedDetails = localStorage.getItem("userDetails");
-            const role = storedDetails ? JSON.parse(storedDetails).role : "employee";
-            router.push(role === "employer" ? "/employer" : "/employee");
+            if (storedDetails) {
+              const { role } = JSON.parse(storedDetails);
+              router.replace(role === "employer" ? "/employer" : "/employee");
+            }
           }
         } catch (error) {
           console.error("Auth check failed:", error);
@@ -30,7 +32,7 @@ export default function Home() {
       }
     };
     checkAuth();
-  }, [isAuthenticated, user, router]);
+  }, [user, router]);
 
 
   const handleConnect = async () => {
@@ -52,9 +54,11 @@ export default function Home() {
       const backendAuthed = await isAuthenticated(user.principal.toText());
       if (backendAuthed) {
         const storedDetails = localStorage.getItem("userDetails");
-        const role = storedDetails ? JSON.parse(storedDetails).role : "employee";
-        router.push(role === "employer" ? "/employer" : "/employee");
-        return;
+        if (storedDetails) {
+          const { role } = JSON.parse(storedDetails);
+          router.replace(role === "employer" ? "/employer" : "/employee");
+          return;
+        }
       }
 
       // Step 4: Authenticate with backend
@@ -66,14 +70,15 @@ export default function Home() {
       );
 
       // Step 5: Store session data
-      localStorage.setItem("userDetails", JSON.stringify({
+      const sessionData = {
         principal: userDetails.principal,
         role: userDetails.role,
         authenticated_at: Date.now()
-      }));
+      };
+      localStorage.setItem("userDetails", JSON.stringify(sessionData));
 
       // Step 6: Redirect
-      router.push(userDetails.role === "employer" ? "/employer" : "/employee");
+      router.replace(userDetails.role === "employer" ? "/employer" : "/employee");
 
     } catch (error) {
       console.error("Authentication failed:", error);
