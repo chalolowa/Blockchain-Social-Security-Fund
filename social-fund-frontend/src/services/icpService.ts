@@ -118,26 +118,30 @@ export const authenticateWithDetails = async (
   employee_details: EmployeeDetails | null,
   employer_details: EmployerDetails | null
 ): Promise<UserDetails> => {
-  const userPrincipal = Principal.fromText(principal);
-  const response = await backend.authenticate_with_details(
+  try {
+    const userPrincipal = Principal.fromText(principal);
+    const response = await backend.authenticate_with_details(
       userPrincipal,
       role,
       employee_details ? [employee_details] : [],
       employer_details ? [employer_details] : []
-  ) as {
-      user_principal: Principal;
-      role: string;
-      authenticated_at: bigint;
-      employee_details: EmployeeDetails[];
-      employer_details: EmployerDetails[];
-  };
-  return {
+    ) as any;
+
+    if (!response?.user_principal) {
+      throw new Error("Invalid authentication response");
+    }
+
+    return {
       principal: response.user_principal.toText(),
       role: response.role,
       authenticated_at: response.authenticated_at,
       employee_details: response.employee_details[0] || null,
       employer_details: response.employer_details[0] || null
-  };
+    };
+  } catch (error) {
+    console.error("Authentication error:", error);
+    throw new Error("Failed to authenticate with backend");
+  }
 };
 
 export const getAuthenticatedUser = async (principal: string) => {

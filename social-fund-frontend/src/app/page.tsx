@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { useAuth } from "@nfid/identitykit/react";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { authenticateWithDetails, isAuthenticated } from "@/services/icpService";
 
 export default function Home() {
@@ -13,41 +13,77 @@ export default function Home() {
   const { connect, user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
+  // Handle post-authentication redirect
+  useEffect(() => {
+    const checkAuth = async () => {
+      if (user?.principal) {
+        try {
+          const authed = await isAuthenticated(user.principal.toText());
+          if (authed) {
+            const storedDetails = localStorage.getItem("userDetails");
+            const role = storedDetails ? JSON.parse(storedDetails).role : "employee";
+            router.push(role === "employer" ? "/employer" : "/employee");
+          }
+        } catch (error) {
+          console.error("Auth check failed:", error);
+        }
+      }
+    };
+    checkAuth();
+  }, [isAuthenticated, user, router]);
+
+
   const handleConnect = async () => {
     try {
       setIsLoading(true);
+      
+      // Step 1: Connect NFID if not already connected
       if (!user) {
         await connect();
-      }
-      
-      // Check if already authenticated with backend
-      const isAuthed = await isAuthenticated(user?.principal.toText() || "");
-      if (isAuthed) {
-          router.push(user?.role === "employer" ? "/employer" : "/employee");
-          return;
+        return; // Exit here as connect() will trigger a re-render with the new user
       }
 
-      // Authenticate with default employee role
+      // Step 2: Ensure we have a principal
+      if (!user.principal) {
+        throw new Error("Failed to get user principal. Please try again.");
+      }
+
+      // Step 3: Verify backend authentication
+      const backendAuthed = await isAuthenticated(user.principal.toText());
+      if (backendAuthed) {
+        const storedDetails = localStorage.getItem("userDetails");
+        const role = storedDetails ? JSON.parse(storedDetails).role : "employee";
+        router.push(role === "employer" ? "/employer" : "/employee");
+        return;
+      }
+
+      // Step 4: Authenticate with backend
       const userDetails = await authenticateWithDetails(
-          user?.principal.toText() || "",
-          "employee", 
-          null,  // No employee details initially
-          null   // No employer details
+        user.principal.toText(),
+        "employee",
+        null,
+        null
       );
-      
-      // Store user details
-      localStorage.setItem("userDetails", JSON.stringify(userDetails));
-      
-      // Redirect based on role
+
+      // Step 5: Store session data
+      localStorage.setItem("userDetails", JSON.stringify({
+        principal: userDetails.principal,
+        role: userDetails.role,
+        authenticated_at: Date.now()
+      }));
+
+      // Step 6: Redirect
       router.push(userDetails.role === "employer" ? "/employer" : "/employee");
 
     } catch (error) {
-      console.error("Failed to connect:", error);
-      toast.error("Authentication failed. Please try again.");
+      console.error("Authentication failed:", error);
+      toast.error(error instanceof Error ? error.message : "Authentication failed. Please try again.");
+      localStorage.removeItem("userDetails");
     } finally {
       setIsLoading(false);
     }
-  }
+  };
+
   
   return (
     <div className="relative w-full min-h-screen flex flex-col items-center justify-center text-white overflow-hidden"

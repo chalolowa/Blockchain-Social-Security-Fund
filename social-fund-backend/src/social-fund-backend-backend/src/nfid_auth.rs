@@ -70,6 +70,16 @@ pub fn authenticate_with_details(
     employee_details: Option<EmployeeDetails>,
     employer_details: Option<EmployerDetails>,
 ) -> Result<UserDetails, String> {
+    // Validate role
+    if role != "employee" && role != "employer" {
+        return Err("Invalid user role".to_string());
+    }
+
+    // Validate principal
+    if user == Principal::anonymous() {
+        return Err("Anonymous principal not allowed".to_string());
+    }
+
     let now = ic_cdk::api::time();
     let user_details = UserDetails {
         user_principal: user,
@@ -79,6 +89,9 @@ pub fn authenticate_with_details(
         employer_details,
     };
 
+    // Log authentication attempt
+    ic_cdk::println!("Authenticating principal: {}", user);
+    
     AUTHENTICATED_USERS.with(|auth| {
         let mut auth_map = auth.borrow_mut();
         auth_map.insert(user, user_details.clone());
