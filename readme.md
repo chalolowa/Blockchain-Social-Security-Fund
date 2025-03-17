@@ -68,7 +68,7 @@ Regular Audits: On-chain verification of fund balances
 
 ### Frontend
 
-NEXT_PUBLIC_NFID_APP_ID=your_nfid_app_id
+NEXT_PUBLIC_CANISTER_ID=your_canister_id
 NEXT_PUBLIC_IC_HOST=<https://ic0.app>
 
 ### Backend

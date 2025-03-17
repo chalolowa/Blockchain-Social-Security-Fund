@@ -30,8 +30,7 @@ pub struct Icrc28TrustedOriginsResponse {
 #[update]
 fn icrc28_trusted_origins() -> Icrc28TrustedOriginsResponse {
     let trusted_origins = vec![
-        String::from("https://your-frontend-canister-id.icp0.io"),
-        String::from("https://yourcustomdomain.com"),
+        String::from("http://localhost:3000"),
     ];
 
     Icrc28TrustedOriginsResponse { trusted_origins }
