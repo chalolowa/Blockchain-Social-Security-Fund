@@ -144,7 +144,7 @@ const getTransactionIcon = (txType: string) => {
         // Get stored user details first
         const storedDetails = localStorage.getItem('userDetails');
         if (!storedDetails) {
-          router.replace('/');
+          console.warn("No userDetails found in localStorage");
           return;
         }
 
@@ -152,6 +152,7 @@ const getTransactionIcon = (txType: string) => {
         
         // Check if user is connected
         if (!user?.principal) {
+          console.warn("User principal not yet available");
           return; // Wait for user to be connected instead of redirecting
         }
 
@@ -159,7 +160,7 @@ const getTransactionIcon = (txType: string) => {
         const isAuth = await isAuthenticated(user.principal.toText());
         if (!isAuth || details.role !== 'employee') {
           localStorage.removeItem('userDetails');
-          router.replace('/');
+          console.warn("Auth failed or role mismatch", isAuth, details.role);
           return;
         }
 
@@ -179,7 +180,9 @@ const getTransactionIcon = (txType: string) => {
       }
     };
 
-    checkAuth();
+    if (user?.principal) {
+      checkAuth();
+    }
   }, [user]);
 
   async function fetchFundInfo() {
@@ -311,7 +314,7 @@ const getTransactionIcon = (txType: string) => {
 
     return (
       <div className="min-h-screen relative" style={{ backgroundImage: `url(${background.src})` }}>
-        <div className="absolute inset-0 bg-background/10 backdrop-blur-sm" />
+        <div className="absolute inset-0 bg-background/10" />
       <div className="flex">
         <Sidebar
           className="w-[250px] border-r bg-white/95 backdrop-blur shadow-lg"

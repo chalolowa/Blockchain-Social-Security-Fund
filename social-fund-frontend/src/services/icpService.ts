@@ -115,33 +115,15 @@ export interface UserDetails {
 export const authenticateWithDetails = async (
   principal: string,
   role: string,
-  employee_details: EmployeeDetails | null,
-  employer_details: EmployerDetails | null
-): Promise<UserDetails> => {
-  try {
-    const userPrincipal = Principal.fromText(principal);
-    const response = await backend.authenticate_with_details(
-      userPrincipal,
-      role,
-      employee_details ? [employee_details] : [],
-      employer_details ? [employer_details] : []
-    ) as any;
-
-    if (!response?.user_principal) {
-      throw new Error("Invalid authentication response");
-    }
-
-    return {
-      principal: response.user_principal.toText(),
-      role: response.role,
-      authenticated_at: response.authenticated_at,
-      employee_details: response.employee_details[0] || null,
-      employer_details: response.employer_details[0] || null
-    };
-  } catch (error) {
-    console.error("Authentication error:", error);
-    throw new Error("Failed to authenticate with backend");
-  }
+  employeeDetails?: any,
+  employerDetails?: any
+) => {
+  return await backend.authenticate_with_details(
+    Principal.fromText(principal),
+    role,
+    employeeDetails ? [employeeDetails] : [],
+    employerDetails ? [employerDetails] : []
+  );
 };
 
 export const getAuthenticatedUser = async (principal: string) => {

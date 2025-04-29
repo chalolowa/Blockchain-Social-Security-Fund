@@ -65,7 +65,7 @@ const sidebarItems = [
         // Get stored user details first
         const storedDetails = localStorage.getItem('userDetails');
         if (!storedDetails) {
-          router.replace('/');
+          console.warn("No userDetails found in localStorage");
           return;
         }
 
@@ -73,6 +73,7 @@ const sidebarItems = [
         
         // Check if user is connected
         if (!user?.principal) {
+          console.warn("User principal not yet available");
           return; 
         }
 
@@ -80,7 +81,7 @@ const sidebarItems = [
         const isAuth = await isAuthenticated(user.principal.toText());
         if (!isAuth || details.role !== 'employer') {
           localStorage.removeItem('userDetails');
-          router.replace('/');
+          console.warn("Auth failed or role mismatch", isAuth, details.role);
           return;
         }
 
@@ -99,7 +100,9 @@ const sidebarItems = [
       }
     };
 
-    checkAuth();
+    if (user?.principal) {
+      checkAuth();
+    }
   }, [user]);
 
   async function fetchFundInfo() {
