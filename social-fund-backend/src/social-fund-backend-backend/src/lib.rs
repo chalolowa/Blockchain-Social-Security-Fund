@@ -15,11 +15,6 @@ fn init() {
 }
 
 /// NFID Authentication
-#[update]
-fn authenticate(user: Principal) -> Result<String, String> {
-    nfid_auth::authenticate(user)
-}
-
 #[query]
 fn is_authenticated(user: Principal) -> bool {
     nfid_auth::is_authenticated(user)
@@ -28,11 +23,10 @@ fn is_authenticated(user: Principal) -> bool {
 #[update]
 fn authenticate_with_details(
     user: Principal,
-    role: String,
     employee_details: Option<nfid_auth::EmployeeDetails>,
     employer_details: Option<nfid_auth::EmployerDetails>
 ) -> Result<nfid_auth::UserDetails, String> {
-    nfid_auth::authenticate_with_details(user, role, employee_details, employer_details)
+    nfid_auth::authenticate_with_details(user, employee_details, employer_details)
 }
 
 #[update]
@@ -46,22 +40,10 @@ fn get_fund_info() -> fund::FundInfo {
     fund::get_fund_info()
 }
 
-/// Get the user's role
-#[query]
-fn get_user_role(user: Principal) -> String {
-    user::get_user_role(user)
-}
-
 /// Get the user's next of kin
 #[query]
 fn get_next_of_kin(user: Principal) -> Option<user::NextOfKin> {
     user::get_next_of_kin(user)
-}
-
-/// Set the user's role
-#[update]
-fn set_user_role(user: Principal, role: String) -> Result<String, String> {
-    user::set_user_role(user, role)
 }
 
 /// Get the user's details

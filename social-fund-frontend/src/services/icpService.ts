@@ -106,7 +106,6 @@ export interface EmployerDetails {
 
 export interface UserDetails {
     principal: string;
-    role: string;
     authenticated_at: bigint;
     employee_details: EmployeeDetails | null;
     employer_details: EmployerDetails | null;
@@ -114,13 +113,11 @@ export interface UserDetails {
 
 export const authenticateWithDetails = async (
   principal: string,
-  role: string,
   employeeDetails?: any,
   employerDetails?: any
 ) => {
   return await backend.authenticate_with_details(
     Principal.fromText(principal),
-    role,
     employeeDetails ? [employeeDetails] : [],
     employerDetails ? [employerDetails] : []
   );

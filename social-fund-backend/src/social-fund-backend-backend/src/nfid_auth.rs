@@ -39,7 +39,6 @@ fn icrc28_trusted_origins() -> Icrc28TrustedOriginsResponse {
 #[derive(CandidType, Deserialize, Clone, Debug)]
 pub struct UserDetails {
     pub user_principal: Principal,
-    pub role: String,
     pub authenticated_at: u64,
     pub employee_details: Option<EmployeeDetails>,
     pub employer_details: Option<EmployerDetails>,
@@ -66,15 +65,9 @@ thread_local! {
 // Authenticate User with Details
 pub fn authenticate_with_details(
     user: Principal,
-    role: String,
     employee_details: Option<EmployeeDetails>,
     employer_details: Option<EmployerDetails>,
 ) -> Result<UserDetails, String> {
-    // Validate role
-    if role != "employee" && role != "employer" {
-        return Err("Invalid user role".to_string());
-    }
-
     // Validate principal
     if user == Principal::anonymous() {
         return Err("Anonymous principal not allowed".to_string());
@@ -83,7 +76,6 @@ pub fn authenticate_with_details(
     let now = ic_cdk::api::time();
     let user_details = UserDetails {
         user_principal: user,
-        role: role.clone(),
         authenticated_at: now,
         employee_details,
         employer_details,
@@ -108,14 +100,6 @@ pub fn get_authenticated_user(user: Principal) -> Option<UserDetails> {
 // Check if User is Authenticated
 pub fn is_authenticated(user: Principal) -> bool {
     AUTHENTICATED_USERS.with(|auth| auth.borrow().contains_key(&user))
-}
-
-pub fn authenticate(user: Principal) -> Result<String, String> {
-    if is_authenticated(user) {
-        Ok("User already authenticated".to_string())
-    } else {
-        Ok("User authentication successful".to_string())
-    }
 }
 
 // Logout User

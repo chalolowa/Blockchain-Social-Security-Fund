@@ -39,14 +39,44 @@ import {
   getTransactions,
   isAuthenticated,
   logout,
+  authenticateWithDetails,
+  getAuthenticatedUser,
 } from "@/services/icpService";
 import { useAuth } from "@nfid/identitykit/react";
 import { toast } from "sonner";
 import background from "../../assets/backgroundark.jpg";
 import { Sidebar } from "@/components/Sidebar";
-import { PieChart, BarChart, User, LayoutDashboard, HandCoins, Scale, Activity, ArrowDownCircle, ArrowUpCircle, Banknote, Bitcoin, CheckCircle2, Clock, Coins, FileText, Gift, Handshake, Save, ThumbsDown, ThumbsUp, Vote, Wallet, LockIcon } from "lucide-react";
+import {
+  PieChart,
+  BarChart,
+  User,
+  LayoutDashboard,
+  HandCoins,
+  Scale,
+  Activity,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  Banknote,
+  Bitcoin,
+  CheckCircle2,
+  Clock,
+  Coins,
+  FileText,
+  Gift,
+  Handshake,
+  Save,
+  ThumbsDown,
+  ThumbsUp,
+  Vote,
+  Wallet,
+  LockIcon,
+} from "lucide-react";
 import { Progress } from "@/components/ui/progress";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Bar, Pie } from "react-chartjs-2";
@@ -59,7 +89,11 @@ export default function EmployeeDashboard() {
   const router = useRouter();
   const [isEmployerView, setIsEmployerView] = useState(false);
   const [fundInfo, setFundInfo] = useState<any>(null);
-  const [nextOfKin, setNextOfKin] = useState({ name: "", relation: "", contact: "" });
+  const [nextOfKin, setNextOfKin] = useState({
+    name: "",
+    relation: "",
+    contact: "",
+  });
   const [transactionHistory, setTransactionHistory] = useState<any[]>([]);
   const [rewards, setRewards] = useState<string>("0");
   const [userDetails, setUserDetails] = useState<any>(null);
@@ -76,80 +110,74 @@ export default function EmployeeDashboard() {
   const [voteApprove, setVoteApprove] = useState<boolean>(true);
   const [activeItem, setActiveItem] = useState("overview");
 
-// Sidebar items configuration
-const sidebarItems = [
-  {
-    id: "profile",
-    label: "Profile Information",
-    icon: <User className="h-4 w-4" />
-  },
-  {
-    id: "overview",
-    label: "Overview",
-    icon: <LayoutDashboard className="h-4 w-4" />
-  },
-  {
-    id: "funds",
-    label: "Funds Management",
-    icon: <HandCoins className="h-4 w-4" />
-  },
-  {
-    id: "governance",
-    label: "Governance",
-    icon: <Scale className="h-4 w-4" />
-  }
-];
-
-// Chart data configuration
-const chartData = {
-  labels: ["ckBTC", "Stable Reserve"],
-  datasets: [
+  // Sidebar items configuration
+  const sidebarItems = [
     {
-      label: 'Asset Distribution',
-      data: [fundInfo?.ckbtc_reserve || 0, fundInfo?.stable_reserve || 0],
-      backgroundColor: ['#10B981', '#3B82F6'],
+      id: "profile",
+      label: "Profile Information",
+      icon: <User className="h-4 w-4" />,
     },
-  ],
-};
+    {
+      id: "overview",
+      label: "Overview",
+      icon: <LayoutDashboard className="h-4 w-4" />,
+    },
+    {
+      id: "funds",
+      label: "Funds Management",
+      icon: <HandCoins className="h-4 w-4" />,
+    },
+    {
+      id: "governance",
+      label: "Governance",
+      icon: <Scale className="h-4 w-4" />,
+    },
+  ];
 
-const chartOptions = {
-  maintainAspectRatio: false,
-  plugins: {
-    tooltip: {
-      callbacks: {
-        label: (context: any) => {
-          const label = context.label || '';
-          const value = context.parsed || 0;
-          return `${label}: ${value.toLocaleString()} USD`;
-        }
-      }
-    }
-  }
-};
+  // Chart data configuration
+  const chartData = {
+    labels: ["ckBTC", "Stable Reserve"],
+    datasets: [
+      {
+        label: "Asset Distribution",
+        data: [fundInfo?.ckbtc_reserve || 0, fundInfo?.stable_reserve || 0],
+        backgroundColor: ["#10B981", "#3B82F6"],
+      },
+    ],
+  };
 
-// Transaction type icons
-const getTransactionIcon = (txType: string) => {
-  const type = txType.toLowerCase();
-  if (type.includes("withdraw")) return <ArrowUpCircle className="h-4 w-4 text-red-500" />;
-  if (type.includes("loan")) return <HandCoins className="h-4 w-4 text-blue-500" />;
-  if (type.includes("stake")) return <LockIcon className="h-4 w-4 text-purple-500" />;
-  return <ArrowDownCircle className="h-4 w-4 text-green-500" />;
-};
+  const chartOptions = {
+    maintainAspectRatio: false,
+    plugins: {
+      tooltip: {
+        callbacks: {
+          label: (context: any) => {
+            const label = context.label || "";
+            const value = context.parsed || 0;
+            return `${label}: ${value.toLocaleString()} USD`;
+          },
+        },
+      },
+    },
+  };
+
+  // Transaction type icons
+  const getTransactionIcon = (txType: string) => {
+    const type = txType.toLowerCase();
+    if (type.includes("withdraw"))
+      return <ArrowUpCircle className="h-4 w-4 text-red-500" />;
+    if (type.includes("loan"))
+      return <HandCoins className="h-4 w-4 text-blue-500" />;
+    if (type.includes("stake"))
+      return <LockIcon className="h-4 w-4 text-purple-500" />;
+    return <ArrowDownCircle className="h-4 w-4 text-green-500" />;
+  };
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
         setIsLoading(true);
-        
-        // Get stored user details first
-        const storedDetails = localStorage.getItem('userDetails');
-        if (!storedDetails) {
-          console.warn("No userDetails found in localStorage");
-          return;
-        }
 
-        const details = JSON.parse(storedDetails);
-        
         // Check if user is connected
         if (!user?.principal) {
           console.warn("User principal not yet available");
@@ -158,19 +186,25 @@ const getTransactionIcon = (txType: string) => {
 
         // Verify authentication and role
         const isAuth = await isAuthenticated(user.principal.toText());
-        if (!isAuth || details.role !== 'employee') {
-          localStorage.removeItem('userDetails');
-          console.warn("Auth failed or role mismatch", isAuth, details.role);
-          return;
+        if (!isAuth) {
+          await authenticateWithDetails(user.principal.toText());
         }
+        const details = await getAuthenticatedUser(user.principal.toText());
 
+        if (!details) {
+          // If for some reason there are still no details, push to employer dashboard
+          router.replace("/employer");
+          return;
+        } else {
+          router.replace("/employee")
+        }
         setUserDetails(details);
 
         // If authenticated, fetch all necessary data
         await Promise.all([
           fetchFundInfo(),
           fetchTransactions(),
-          fetchRewards()
+          fetchRewards(),
         ]);
       } catch (error) {
         console.error("Error checking authentication:", error);
@@ -275,7 +309,11 @@ const getTransactionIcon = (txType: string) => {
 
   const handleVote = async () => {
     try {
-      await voteOnProposal(proposalId, voteApprove, user?.principal.toText() || "");
+      await voteOnProposal(
+        proposalId,
+        voteApprove,
+        user?.principal.toText() || ""
+      );
       toast("Vote recorded.");
     } catch (error) {
       console.error("Error voting on proposal", error);
@@ -295,15 +333,19 @@ const getTransactionIcon = (txType: string) => {
   };
 
   // Filter transactions based on type
-  const ckbtcTransactions = transactionHistory.filter(tx => tx.tx_type.toLowerCase().includes("ckbtc"));
-  const stableTransactions = transactionHistory.filter(tx => !tx.tx_type.toLowerCase().includes("ckbtc"));
+  const ckbtcTransactions = transactionHistory.filter((tx) =>
+    tx.tx_type.toLowerCase().includes("ckbtc")
+  );
+  const stableTransactions = transactionHistory.filter(
+    (tx) => !tx.tx_type.toLowerCase().includes("ckbtc")
+  );
 
   const handleLogout = async () => {
     try {
       if (user?.principal) {
         await logout(user.principal.toText());
-        localStorage.removeItem('userDetails');
-        router.replace('/');
+        localStorage.removeItem("userDetails");
+        router.replace("/");
       }
     } catch (error) {
       console.error("Error logging out:", error);
@@ -311,10 +353,12 @@ const getTransactionIcon = (txType: string) => {
     }
   };
 
-
-    return (
-      <div className="min-h-screen relative" style={{ backgroundImage: `url(${background.src})` }}>
-        <div className="absolute inset-0 bg-background/10" />
+  return (
+    <div
+      className="min-h-screen relative"
+      style={{ backgroundImage: `url(${background.src})` }}
+    >
+      <div className="absolute inset-0 bg-background/10" />
       <div className="flex">
         <Sidebar
           className="w-[250px] border-r bg-white/95 backdrop-blur shadow-lg"
@@ -323,7 +367,7 @@ const getTransactionIcon = (txType: string) => {
           setActiveItem={setActiveItem}
           onLogout={handleLogout}
         />
-        
+
         <div className="flex-1 p-8 space-y-6">
           {/* Profile Section */}
           {activeItem === "profile" && (
@@ -334,7 +378,10 @@ const getTransactionIcon = (txType: string) => {
                     <User className="h-6 w-6 text-primary" />
                     Profile Information
                   </h3>
-                  <Badge variant="outline" className="bg-emerald-100 text-emerald-800">
+                  <Badge
+                    variant="outline"
+                    className="bg-emerald-100 text-emerald-800"
+                  >
                     Employee Account
                   </Badge>
                 </div>
@@ -344,7 +391,9 @@ const getTransactionIcon = (txType: string) => {
                   <div>
                     <Label className="text-sm font-medium">Full Name</Label>
                     <Input
-                      value={userDetails?.employee_details?.name || "Not provided"}
+                      value={
+                        userDetails?.employee_details?.name || "Not provided"
+                      }
                       readOnly
                       className="bg-gray-50"
                     />
@@ -352,34 +401,48 @@ const getTransactionIcon = (txType: string) => {
                   <div>
                     <Label className="text-sm font-medium">Position</Label>
                     <Input
-                      value={userDetails?.employee_details?.position || "Not provided"}
+                      value={
+                        userDetails?.employee_details?.position ||
+                        "Not provided"
+                      }
                       readOnly
                       className="bg-gray-50"
                     />
                   </div>
                 </div>
-                
+
                 <Separator className="my-4" />
-                
-                <h4 className="text-lg font-semibold">Beneficiary Information</h4>
+
+                <h4 className="text-lg font-semibold">
+                  Beneficiary Information
+                </h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <Input
                     placeholder="Name"
                     value={nextOfKin.name}
-                    onChange={(e) => setNextOfKin({ ...nextOfKin, name: e.target.value })}
+                    onChange={(e) =>
+                      setNextOfKin({ ...nextOfKin, name: e.target.value })
+                    }
                   />
                   <Input
                     placeholder="Relationship"
                     value={nextOfKin.relation}
-                    onChange={(e) => setNextOfKin({ ...nextOfKin, relation: e.target.value })}
+                    onChange={(e) =>
+                      setNextOfKin({ ...nextOfKin, relation: e.target.value })
+                    }
                   />
                   <Input
                     placeholder="Contact Information"
                     value={nextOfKin.contact}
-                    onChange={(e) => setNextOfKin({ ...nextOfKin, contact: e.target.value })}
+                    onChange={(e) =>
+                      setNextOfKin({ ...nextOfKin, contact: e.target.value })
+                    }
                   />
                 </div>
-                <Button onClick={handleAddNextOfKin} className="w-full md:w-auto">
+                <Button
+                  onClick={handleAddNextOfKin}
+                  className="w-full md:w-auto"
+                >
                   <Save className="mr-2 h-4 w-4" />
                   Save Beneficiary
                 </Button>
@@ -396,13 +459,20 @@ const getTransactionIcon = (txType: string) => {
                     <div>
                       <p className="text-sm text-gray-600">Total Balance</p>
                       <h2 className="text-3xl font-bold mt-2">
-                        ${(fundInfo?.ckbtc_reserve + fundInfo?.stable_reserve).toLocaleString()}
+                        $
+                        {(
+                          fundInfo?.ckbtc_reserve + fundInfo?.stable_reserve
+                        ).toLocaleString()}
                       </h2>
                     </div>
                     <Wallet className="h-8 w-8 text-emerald-600" />
                   </div>
-                  <Progress 
-                    value={(fundInfo?.ckbtc_reserve / (fundInfo?.ckbtc_reserve + fundInfo?.stable_reserve)) * 100}
+                  <Progress
+                    value={
+                      (fundInfo?.ckbtc_reserve /
+                        (fundInfo?.ckbtc_reserve + fundInfo?.stable_reserve)) *
+                      100
+                    }
                     className="mt-4 h-2 bg-gray-200"
                   />
                   <div className="flex justify-between text-sm mt-2">
@@ -419,14 +489,16 @@ const getTransactionIcon = (txType: string) => {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-gray-600">Governance Power</p>
-                      <h2 className="text-3xl font-bold mt-2">{rewards} Votes</h2>
+                      <h2 className="text-3xl font-bold mt-2">
+                        {rewards} Votes
+                      </h2>
                     </div>
                     <Badge className="bg-blue-100 text-blue-800 px-3 py-1">
                       Tier 2 Member
                     </Badge>
                   </div>
-                  <Button 
-                    onClick={handleClaimRewards} 
+                  <Button
+                    onClick={handleClaimRewards}
                     className="mt-4 w-full bg-blue-600 hover:bg-blue-700"
                   >
                     <Gift className="mr-2 h-4 w-4" />
@@ -461,17 +533,23 @@ const getTransactionIcon = (txType: string) => {
                   </CardHeader>
                   <CardContent className="h-64">
                     {transactionHistory.length > 0 ? (
-                      <Bar 
+                      <Bar
                         data={{
-                          labels: transactionHistory.map(t => 
-                            new Date(Number(t.timestamp) * 1000).toLocaleDateString()
+                          labels: transactionHistory.map((t) =>
+                            new Date(
+                              Number(t.timestamp) * 1000
+                            ).toLocaleDateString()
                           ),
-                          datasets: [{
-                            label: 'Contributions',
-                            data: transactionHistory.map(t => Number(t.amount)),
-                            backgroundColor: '#10B981',
-                            borderRadius: 4,
-                          }]
+                          datasets: [
+                            {
+                              label: "Contributions",
+                              data: transactionHistory.map((t) =>
+                                Number(t.amount)
+                              ),
+                              backgroundColor: "#10B981",
+                              borderRadius: 4,
+                            },
+                          ],
                         }}
                         options={chartOptions}
                       />
@@ -497,7 +575,9 @@ const getTransactionIcon = (txType: string) => {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label className="text-sm font-medium">Amount (ckBTC)</Label>
+                    <Label className="text-sm font-medium">
+                      Amount (ckBTC)
+                    </Label>
                     <Input
                       type="number"
                       value={ckbtcAmount}
@@ -524,8 +604,8 @@ const getTransactionIcon = (txType: string) => {
                       </SelectItem>
                     </SelectContent>
                   </Select>
-                  <Button 
-                    onClick={handleCkbtcAction} 
+                  <Button
+                    onClick={handleCkbtcAction}
                     className="w-full bg-emerald-600 hover:bg-emerald-700"
                   >
                     Confirm ckBTC Action
@@ -574,8 +654,8 @@ const getTransactionIcon = (txType: string) => {
                       </SelectItem>
                     </SelectContent>
                   </Select>
-                  <Button 
-                    onClick={handleStableAction} 
+                  <Button
+                    onClick={handleStableAction}
                     className="w-full bg-blue-600 hover:bg-blue-700"
                   >
                     Confirm Stable Action
@@ -603,7 +683,10 @@ const getTransactionIcon = (txType: string) => {
                         <div key={id} className="p-4 bg-gray-50 rounded-lg">
                           <div className="flex items-center justify-between">
                             <span className="font-medium">Proposal #{id}</span>
-                            <Badge variant="outline" className="bg-purple-100 text-purple-800">
+                            <Badge
+                              variant="outline"
+                              className="bg-purple-100 text-purple-800"
+                            >
                               Voting Open
                             </Badge>
                           </div>
@@ -624,7 +707,9 @@ const getTransactionIcon = (txType: string) => {
                         value={proposalId}
                         onChange={(e) => setProposalId(Number(e.target.value))}
                       />
-                      <Select onValueChange={(v) => setVoteApprove(v === "approve")}>
+                      <Select
+                        onValueChange={(v) => setVoteApprove(v === "approve")}
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Select vote" />
                         </SelectTrigger>
@@ -639,8 +724,8 @@ const getTransactionIcon = (txType: string) => {
                           </SelectItem>
                         </SelectContent>
                       </Select>
-                      <Button 
-                        onClick={handleVote} 
+                      <Button
+                        onClick={handleVote}
                         className="w-full bg-purple-600 hover:bg-purple-700"
                       >
                         <Vote className="mr-2 h-4 w-4" />
@@ -656,12 +741,18 @@ const getTransactionIcon = (txType: string) => {
                   <h4 className="text-lg font-semibold mb-4">Voting History</h4>
                   <div className="space-y-2">
                     {[1, 2, 3].map((id) => (
-                      <div key={id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                      <div
+                        key={id}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                      >
                         <div className="flex items-center gap-2">
                           <CheckCircle2 className="h-4 w-4 text-green-600" />
                           <span>Proposal #{id}</span>
                         </div>
-                        <Badge variant="outline" className="bg-green-100 text-green-800">
+                        <Badge
+                          variant="outline"
+                          className="bg-green-100 text-green-800"
+                        >
                           Approved
                         </Badge>
                       </div>
@@ -674,5 +765,5 @@ const getTransactionIcon = (txType: string) => {
         </div>
       </div>
     </div>
-    );
+  );
 }
