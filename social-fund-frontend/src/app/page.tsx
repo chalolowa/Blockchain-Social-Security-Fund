@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { useAuth } from "@nfid/identitykit/react";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
-import { authenticateWithDetails, isAuthenticated } from "@/services/icpService";
+import { authenticateWithDetails, getAuthenticatedUser, isAuthenticated, UserDetails } from "@/services/icpService";
 
 export default function Home() {
   const router = useRouter();
@@ -36,58 +36,60 @@ export default function Home() {
 
 
   const handleConnect = async () => {
-    try {
-      setIsLoading(true);
-      
-      // Step 1: Connect NFID if not already connected
-      if (!user) {
-        await connect();
-        return; // Exit here as connect() will trigger a re-render with the new user
-      }
+  try {
+    setIsLoading(true);
 
-      // Step 2: Ensure we have a principal
-      if (!user.principal) {
-        throw new Error("Failed to get user principal. Please try again.");
-      }
-
-      // Step 3: Verify backend authentication
-      const backendAuthed = await isAuthenticated(user.principal.toText());
-      if (backendAuthed) {
-        const storedDetails = localStorage.getItem("userDetails");
-        if (storedDetails) {
-          const { role } = JSON.parse(storedDetails);
-          router.replace(role === "employer" ? "/employer" : "/employee");
-          return;
-        }
-      }
-
-      // Step 4: Authenticate with backend
-      const userDetails = await authenticateWithDetails(
-        user.principal.toText(),
-        "employee",
-        null,
-        null
-      );
-
-      // Step 5: Store session data
-      const sessionData = {
-        principal: userDetails.principal,
-        role: userDetails.role,
-        authenticated_at: Date.now()
-      };
-      localStorage.setItem("userDetails", JSON.stringify(sessionData));
-
-      // Step 6: Redirect
-      router.replace(userDetails.role === "employer" ? "/employer" : "/employee");
-
-    } catch (error) {
-      console.error("Authentication failed:", error);
-      toast.error(error instanceof Error ? error.message : "Authentication failed. Please try again.");
-      localStorage.removeItem("userDetails");
-    } finally {
-      setIsLoading(false);
+    // Step 1: Connect NFID
+    if (!user) {
+      await connect();
     }
-  };
+
+    // Step 2: Ensure principal exists
+    const principal = user?.principal?.toText();
+    if (!principal) throw new Error("No principal found");
+
+    // Step 3: Check if already authenticated
+    const authed = await isAuthenticated(principal);
+
+    if (authed) {
+      const userDetails = await getAuthenticatedUser(principal) as UserDetails;
+      if (!userDetails) {
+        throw new Error("Authenticated but no user details found.");
+      }
+
+      // Determine role
+      const isEmployee = userDetails.employee_details !== null;
+      const sessionData = {
+        principal,
+        role: isEmployee ? "employee" : "employer",
+        authenticated_at: userDetails.authenticated_at,
+      };
+
+      localStorage.setItem("userDetails", JSON.stringify(sessionData));
+      router.replace(isEmployee ? "/employee" : "/employer");
+      return;
+    }
+
+    // Step 4: Not authenticated — default to employer onboarding
+    const newUserDetails = await authenticateWithDetails(principal);
+
+    const sessionData = {
+      principal,
+      role: "employer", // default for first-time users
+      authenticated_at: newUserDetails.authenticated_at,
+    };
+
+    localStorage.setItem("userDetails", JSON.stringify(sessionData));
+    router.replace("/employer");
+
+  } catch (error) {
+    console.error("Authentication failed:", error);
+    toast.error(error instanceof Error ? error.message : "Authentication failed");
+    localStorage.removeItem("userDetails");
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   
   return (

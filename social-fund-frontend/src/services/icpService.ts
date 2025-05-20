@@ -25,6 +25,20 @@ export const getFundInfo = async () => {
   return await backend.get_fund_info();
 };
 
+export const addEmployee = async (principal: Principal, p0: Principal, p1: { salary: number; name: string; position: string; email: string; wallet_address: string; }, user: string, employee: EmployeeDetails) => {
+  const userPrincipal = Principal.fromText(user);
+  return await backend.add_employee(userPrincipal, employee);
+}
+
+export const getEmployee = async (user: string) => {
+  const userPrincipal = Principal.fromText(user);
+  return await backend.get_employee(userPrincipal);
+};
+
+export const getAllEmployees = async () => {
+  return await backend.get_all_employees();
+};
+
 export const addNextOfKin = async (nextOfKin: any, user: string) => {
     const userPrincipal = Principal.fromText(user);
     return await backend.add_next_of_kin(userPrincipal, nextOfKin);
@@ -93,15 +107,22 @@ export const employerMatch = async (employee: string, amount: number) => {
   return await backend.employer_match(employee, BigInt(amount));
 };
 
+export const contribute = async (user: string, amount: number) => {
+  return await backend.contribute(user, BigInt(amount));
+};
+
 export interface EmployeeDetails {
     name: string;
     position: string;
     salary: number;
+    wallet_address: string;
+    email: string;
 }
 
 export interface EmployerDetails {
     company_name: string;
     registration_number: string;
+    wallet_address: string;
 }
 
 export interface UserDetails {
@@ -115,12 +136,14 @@ export const authenticateWithDetails = async (
   principal: string,
   employeeDetails?: any,
   employerDetails?: any
-) => {
-  return await backend.authenticate_with_details(
+): Promise<UserDetails> => {
+  const result =  await backend.authenticate_with_details(
     Principal.fromText(principal),
     employeeDetails ? [employeeDetails] : [],
     employerDetails ? [employerDetails] : []
   );
+
+  return result as UserDetails;
 };
 
 export const getAuthenticatedUser = async (principal: string) => {

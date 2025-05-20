@@ -8,6 +8,7 @@ mod nfid_auth;
 mod transactions;
 use candid::Principal;
 use ic_cdk_macros::{init, query, update};
+use user::Employee;
 
 #[init]
 fn init() {
@@ -169,3 +170,22 @@ fn repay_ckbtc(amount: u64, user: Principal) -> Result<String, String> {
 fn get_transactions() -> Vec<transactions::Transaction> {
     transactions::get_transactions()
 }
+
+/// Add an employee under a principal (e.g., employer adds them)
+#[update]
+fn add_employee(employee: Employee, user: Principal) {
+    user::add_employee(user, employee);
+}
+
+/// Get one employee by principal
+#[query]
+fn get_employee(principal: Principal) -> Option<Employee> {
+    user::get_employee(principal)
+}
+
+/// Get all registered employees
+#[query]
+fn get_employees() -> Vec<Employee> {
+    user::get_all_employees()
+}
+
