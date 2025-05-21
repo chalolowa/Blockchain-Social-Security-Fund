@@ -38,13 +38,20 @@ export function EmployeeManagement() {
 
   const handleAddEmployee = async () => {
     if (!newEmployee.name || !newEmployee.position || !newEmployee.salary) {
-      toast("Please fill all employee details");
+      toast.error("Please fill all employee details");
       return;
     }
-
-    await addEmployee(principal || "", newEmployee);
-    setNewEmployee({ name: "", email: "", wallet_address: "", position: "", salary: 0 });
-    toast.success("Employee added successfully");
+    try {
+      await addEmployee(principal, newEmployee);
+      toast.success("Employee added");
+      setNewEmployee({ name: "", email: "", wallet_address: "", position: "", salary: 0 });
+      // refresh list
+      const list = await getAllEmployees();
+      setEmployees(list);
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to add employee");
+    }
   };
 
   const fetchEmployees = async () => {

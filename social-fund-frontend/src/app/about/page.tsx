@@ -5,7 +5,7 @@ import { CheckCircleIcon, LockClosedIcon, CurrencyDollarIcon, UserGroupIcon } fr
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useAuth } from "@nfid/identitykit/react";
-import { authenticateWithDetails, isAuthenticated } from "@/services/icpService";
+import { authenticateWithDetails, getAuthenticatedUser, isAuthenticated, UserDetails } from "@/services/icpService";
 import { useEffect, useState } from "react";
 
 export default function About() {
@@ -13,75 +13,53 @@ export default function About() {
   const {connect, user} = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
-  // Handle post-authentication redirect
   useEffect(() => {
-    const checkAuth = async () => {
-      if (user?.principal) {
-        try {
-          const authed = await isAuthenticated(user.principal.toText());
-          if (authed) {
-            const storedDetails = localStorage.getItem("userDetails");
-            const role = storedDetails ? JSON.parse(storedDetails).role : "employee";
-            router.push(role === "employer" ? "/employer" : "/employee");
+    const checkUser = async () => {
+      if (!user?.principal) return;
+
+      try {
+        const princText = user.principal.toText();
+        const authed = await isAuthenticated(princText);
+
+        if (authed) {
+          const details = await getAuthenticatedUser(princText) as UserDetails;
+          // if employee_details exists => employee dashboard
+          if (details?.employee_details) {
+            router.replace("/employee");
+          } else {
+            // no employee record => employer dashboard (onboarding)
+            router.replace("/employer");
           }
-        } catch (error) {
-          console.error("Auth check failed:", error);
+        } else {
+          // never seen before => send to employer onboarding
+          router.replace("/employer");
         }
+      } catch (err) {
+        console.error("Auth check error:", err);
+        toast.error("Failed to verify authentication");
       }
     };
-    checkAuth();
-  }, [isAuthenticated, user, router]);
+
+    checkUser();
+  }, [user, router]);
 
   const handleConnect = async () => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      
-      // Step 1: Connect NFID if not already connected
+      // trigger NFID popup if not connected
       if (!user) {
         await connect();
-        return; // Exit here as connect() will trigger a re-render with the new user
-      }
-
-      // Step 2: Ensure we have a principal
-      if (!user.principal) {
-        throw new Error("Failed to get user principal. Please try again.");
-      }
-
-      // Step 3: Verify backend authentication
-      const backendAuthed = await isAuthenticated(user.principal.toText());
-      if (backendAuthed) {
-        const storedDetails = localStorage.getItem("userDetails");
-        const role = storedDetails ? JSON.parse(storedDetails).role : "employee";
-        router.push(role === "employer" ? "/employer" : "/employee");
         return;
       }
-
-      // Step 4: Authenticate with backend
-      const userDetails = await authenticateWithDetails(
-        user.principal.toText(),
-        "employee",
-        null,
-        null
-      );
-
-      // Step 5: Store session data
-      localStorage.setItem("userDetails", JSON.stringify({
-        principal: userDetails.principal,
-        role: userDetails.role,
-        authenticated_at: Date.now()
-      }));
-
-      // Step 6: Redirect
-      router.push(userDetails.role === "employer" ? "/employer" : "/employee");
-
-    } catch (error) {
-      console.error("Authentication failed:", error);
-      toast.error(error instanceof Error ? error.message : "Authentication failed. Please try again.");
-      localStorage.removeItem("userDetails");
+      // already connected, effect above will run
+    } catch (err) {
+      console.error("NFID connect failed:", err);
+      toast.error("Connection failed. Try again.");
     } finally {
       setIsLoading(false);
     }
   };
+
 
   const features = [
     {

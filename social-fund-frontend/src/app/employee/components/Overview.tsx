@@ -24,7 +24,7 @@ export function Overview() {
       try {
         const [fundData, rewardAmt, txHistory] = await Promise.all([
           getFundInfo(),
-          checkRewards(user.principal),
+          checkRewards(principal),
           getTransactions(),
         ]);
         setFundInfo(fundData);

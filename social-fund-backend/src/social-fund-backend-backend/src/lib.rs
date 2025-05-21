@@ -185,7 +185,7 @@ fn get_employee(principal: Principal) -> Option<Employee> {
 
 /// Get all registered employees
 #[query]
-fn get_employees() -> Vec<Employee> {
+fn get_all_employees() -> Vec<Employee> {
     user::get_all_employees()
 }
 

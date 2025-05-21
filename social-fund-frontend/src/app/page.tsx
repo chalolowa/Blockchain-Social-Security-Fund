@@ -13,83 +13,53 @@ export default function Home() {
   const { connect, user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
-  // Handle post-authentication redirect
   useEffect(() => {
-    const checkAuth = async () => {
-      if (user?.principal) {
-        try {
-          const authed = await isAuthenticated(user.principal.toText());
-          if (authed) {
-            const storedDetails = localStorage.getItem("userDetails");
-            if (storedDetails) {
-              const { role } = JSON.parse(storedDetails);
-              router.replace(role === "employer" ? "/employer" : "/employee");
-            }
+    const checkUser = async () => {
+      if (!user?.principal) return;
+
+      try {
+        const princText = user.principal.toText();
+        const authed = await isAuthenticated(princText);
+
+        if (authed) {
+          const details = await getAuthenticatedUser(princText) as UserDetails;
+          // if employee_details exists => employee dashboard
+          if (details?.employee_details) {
+            router.replace("/employee");
+          } else {
+            // no employee record => employer dashboard (onboarding)
+            router.replace("/employer");
           }
-        } catch (error) {
-          console.error("Auth check failed:", error);
+        } else {
+          // never seen before => send to employer onboarding
+          router.replace("/employer");
         }
+      } catch (err) {
+        console.error("Auth check error:", err);
+        toast.error("Failed to verify authentication");
       }
     };
-    checkAuth();
+
+    checkUser();
   }, [user, router]);
 
-
   const handleConnect = async () => {
-  try {
     setIsLoading(true);
-
-    // Step 1: Connect NFID
-    if (!user) {
-      await connect();
-    }
-
-    // Step 2: Ensure principal exists
-    const principal = user?.principal?.toText();
-    if (!principal) throw new Error("No principal found");
-
-    // Step 3: Check if already authenticated
-    const authed = await isAuthenticated(principal);
-
-    if (authed) {
-      const userDetails = await getAuthenticatedUser(principal) as UserDetails;
-      if (!userDetails) {
-        throw new Error("Authenticated but no user details found.");
+    try {
+      // trigger NFID popup if not connected
+      if (!user) {
+        await connect();
+        return;
       }
-
-      // Determine role
-      const isEmployee = userDetails.employee_details !== null;
-      const sessionData = {
-        principal,
-        role: isEmployee ? "employee" : "employer",
-        authenticated_at: userDetails.authenticated_at,
-      };
-
-      localStorage.setItem("userDetails", JSON.stringify(sessionData));
-      router.replace(isEmployee ? "/employee" : "/employer");
-      return;
+      // already connected, effect above will run
+    } catch (err) {
+      console.error("NFID connect failed:", err);
+      toast.error("Connection failed. Try again.");
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    // Step 4: Not authenticated — default to employer onboarding
-    const newUserDetails = await authenticateWithDetails(principal);
-
-    const sessionData = {
-      principal,
-      role: "employer", // default for first-time users
-      authenticated_at: newUserDetails.authenticated_at,
-    };
-
-    localStorage.setItem("userDetails", JSON.stringify(sessionData));
-    router.replace("/employer");
-
-  } catch (error) {
-    console.error("Authentication failed:", error);
-    toast.error(error instanceof Error ? error.message : "Authentication failed");
-    localStorage.removeItem("userDetails");
-  } finally {
-    setIsLoading(false);
-  }
-};
 
   
   return (
