@@ -1,0 +1,5 @@
+[workspace]
+members = [
+    "src/wallet-factory-backend"
+]
+resolver = "2"

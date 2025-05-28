@@ -1,0 +1,5 @@
+[workspace]
+members = [
+    "src/identity-registry-backend"
+]
+resolver = "2"

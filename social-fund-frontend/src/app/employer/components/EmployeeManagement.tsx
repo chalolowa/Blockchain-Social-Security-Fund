@@ -17,13 +17,13 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { toast } from "sonner";
-import { addEmployee, getAllEmployees } from "@/services/icpService";
+import { addEmployee, Employee, EmployeeDetails, getAllEmployees } from "@/services/icpService";
 import { useAuth } from "@nfid/identitykit/react";
 
 export function EmployeeManagement() {
   const { user } = useAuth();
   const principal = user?.principal.toText();
-  const [employees, setEmployees] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [newEmployee, setNewEmployee] = useState({
     name: "",
     email: "",
@@ -42,7 +42,7 @@ export function EmployeeManagement() {
       return;
     }
     try {
-      await addEmployee(principal, newEmployee);
+      await addEmployee(principal || "", newEmployee);
       toast.success("Employee added");
       setNewEmployee({ name: "", email: "", wallet_address: "", position: "", salary: 0 });
       // refresh list
@@ -124,7 +124,6 @@ export function EmployeeManagement() {
           <TableBody>
             {employees.map((emp, idx) => (
               <TableRow key={idx}>
-                <TableCell>{emp.id}</TableCell>
                 <TableCell>{emp.name}</TableCell>
                 <TableCell>{emp.email}</TableCell>
                 <TableCell>{emp.position}</TableCell>

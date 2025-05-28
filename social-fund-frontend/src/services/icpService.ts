@@ -25,18 +25,30 @@ export const getFundInfo = async () => {
   return await backend.get_fund_info();
 };
 
-export const addEmployee = async (principal: Principal, p0: Principal, p1: { salary: number; name: string; position: string; email: string; wallet_address: string; }, user: string, employee: EmployeeDetails) => {
-  const userPrincipal = Principal.fromText(user);
-  return await backend.add_employee(userPrincipal, employee);
-}
+export const addEmployee = async (
+  userPrincipal: string,
+  employee: EmployeeDetails
+) => {
+  const principal = Principal.fromText(userPrincipal);
+  return await backend.add_employee(principal, employee);
+};
 
 export const getEmployee = async (user: string) => {
   const userPrincipal = Principal.fromText(user);
   return await backend.get_employee(userPrincipal);
 };
 
-export const getAllEmployees = async () => {
-  return await backend.get_all_employees();
+export interface Employee {
+  name: string;
+  email: string;
+  wallet_address: string;
+  position: string;
+  salary: string;
+  principal: string;
+}
+
+export const getAllEmployees = async (): Promise<Employee[]> => {
+  return await backend.get_all_employees() as Employee[];
 };
 
 export const addNextOfKin = async (nextOfKin: any, user: string) => {

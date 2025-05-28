@@ -1,0 +1,17 @@
+{
+  "canisters": {
+    "wallet-factory-backend": {
+      "candid": "src/wallet-factory-backend/wallet-factory-backend.did",
+      "package": "wallet-factory-backend",
+      "type": "rust"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}

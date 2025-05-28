@@ -1,0 +1,17 @@
+{
+  "canisters": {
+    "identity-registry-backend": {
+      "candid": "src/identity-registry-backend/identity-registry-backend.did",
+      "package": "identity-registry-backend",
+      "type": "rust"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}

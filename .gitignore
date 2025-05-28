@@ -58,6 +58,7 @@ next-env.d.ts
 
 # generated files
 **/declarations/
+social-fund-frontend/out/
 
 # rust
 target/

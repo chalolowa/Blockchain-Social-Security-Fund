@@ -24,7 +24,7 @@ export function Overview() {
       try {
         const [fundData, rewardAmt, txHistory] = await Promise.all([
           getFundInfo(),
-          checkRewards(principal),
+          checkRewards(principal || ""),
           getTransactions(),
         ]);
         setFundInfo(fundData);
@@ -43,9 +43,9 @@ export function Overview() {
 
   const handleClaimRewards = async () => {
     try {
-      await redeemRewards(user.principal);
+      await redeemRewards(principal || "");
       toast.success("Rewards claimed successfully");
-      const rewardAmt = await checkRewards(user.principal);
+      const rewardAmt = await checkRewards(principal || "");
       setRewards(String(rewardAmt));
     } catch (error) {
       toast.error("Failed to claim rewards");
