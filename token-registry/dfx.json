@@ -1,0 +1,17 @@
+{
+  "canisters": {
+    "token-registry-backend": {
+      "candid": "src/token-registry-backend/token-registry-backend.did",
+      "package": "token-registry-backend",
+      "type": "rust"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}

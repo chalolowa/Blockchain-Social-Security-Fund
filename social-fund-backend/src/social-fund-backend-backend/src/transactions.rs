@@ -1,48 +1,25 @@
-use candid::{CandidType, Principal};
-use std::collections::HashMap;
 use std::cell::RefCell;
-use std::time::{SystemTime, UNIX_EPOCH};
+use candid::Principal;
 
-#[derive(Clone, CandidType)]
-pub struct Transaction {
-    pub tx_id: u64,
+#[derive(Clone, Debug)]
+pub struct TxLog {
     pub user: Principal,
-    pub tx_type: String,
-    pub amount: u64,
+    pub action: String,
+    pub amount: Option<u128>,
     pub timestamp: u64,
 }
 
 thread_local! {
-    static TRANSACTIONS: RefCell<HashMap<u64, Transaction>> = RefCell::new(HashMap::new());
-    static TX_COUNTER: RefCell<u64> = RefCell::new(0);
+    pub static TRANSACTIONS: RefCell<Vec<TxLog>> = RefCell::new(Vec::new());
 }
 
-// Helper function to create a transaction log
-pub fn log_transaction(user: Principal, tx_type: &str, amount: u64) {
-    let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
-    let tx_id = TX_COUNTER.with(|c| {
-        let mut count = c.borrow_mut();
-        *count += 1;
-        *count
+pub fn log_event(user: Principal, action: &str, amount: Option<u128>) {
+    TRANSACTIONS.with(|txs| {
+        txs.borrow_mut().push(TxLog {
+            user,
+            action: action.to_string(),
+            amount,
+            timestamp: ic_cdk::api::time(),
+        });
     });
-
-    let transaction = Transaction {
-        tx_id,
-        user,
-        tx_type: tx_type.to_string(),
-        amount,
-        timestamp,
-    };
-
-    TRANSACTIONS.with(|t| {
-        let mut transactions = t.borrow_mut();
-        transactions.insert(tx_id, transaction);
-    });
-
-    ic_cdk::println!("Transaction logged: {} - {} ckBTC", tx_type, amount);
-}
-
-// Query all transactions
-pub fn get_transactions() -> Vec<Transaction> {
-    TRANSACTIONS.with(|t| t.borrow().values().cloned().collect())
 }

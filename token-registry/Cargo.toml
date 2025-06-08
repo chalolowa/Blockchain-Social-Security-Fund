@@ -1,0 +1,5 @@
+[workspace]
+members = [
+    "src/token-registry-backend"
+]
+resolver = "2"
