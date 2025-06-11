@@ -1,0 +1,17 @@
+{
+  "canisters": {
+    "token-factory-backend": {
+      "candid": "src/token-factory-backend/token-factory-backend.did",
+      "package": "token-factory-backend",
+      "type": "rust"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}

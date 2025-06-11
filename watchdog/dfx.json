@@ -1,0 +1,17 @@
+{
+  "canisters": {
+    "watchdog_backend": {
+      "candid": "src/watchdog_backend/watchdog_backend.did",
+      "package": "watchdog_backend",
+      "type": "rust"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}
