@@ -1,174 +1,221 @@
-import { Actor, HttpAgent } from "@dfinity/agent";
-import { idlFactory } from "../declarations/social-fund-backend-backend/service.did.js";
+import { Actor, HttpAgent, Identity } from "@dfinity/agent";
 import { Principal } from "@dfinity/principal";
-import { IDL } from "@dfinity/candid";
+import { fromByteArray, toByteArray } from "base64-js"
+import { idlFactory as IdentityBrokerIdl } from "../../../social-fund-backend/identity-broker/src/declarations/identity-broker-backend/identity-broker-backend.did";
 
-const host = process.env.NEXT_PUBLIC_IC_HOST || "https://ic0.app";
-
-// Create an agent
-const agent = new HttpAgent({ host });
-
-// In development, we need to fetch the root key
-if (process.env.NODE_ENV !== "production") {
-  agent.fetchRootKey().catch(err => {
-    console.warn("Unable to fetch root key. Check your local replica is running");
-    console.error(err);
-  });
-}
-
-// Create an actor for your canister
-const canisterId = process.env.NEXT_PUBLIC_CANISTER_ID || "";
-const backend = Actor.createActor(idlFactory, { agent, canisterId });
-
-// functions:
-export const getFundInfo = async () => {
-  return await backend.get_fund_info();
-};
-
-export const addEmployee = async (
-  userPrincipal: string,
-  employee: EmployeeDetails
-) => {
-  const principal = Principal.fromText(userPrincipal);
-  return await backend.add_employee(principal, employee);
-};
-
-export const getEmployee = async (user: string) => {
-  const userPrincipal = Principal.fromText(user);
-  return await backend.get_employee(userPrincipal);
-};
-
-export interface Employee {
-  name: string;
-  email: string;
-  wallet_address: string;
-  position: string;
-  salary: string;
-  principal: string;
-}
-
-export const getAllEmployees = async (): Promise<Employee[]> => {
-  return await backend.get_all_employees() as Employee[];
-};
-
-export const addNextOfKin = async (nextOfKin: any, user: string) => {
-    const userPrincipal = Principal.fromText(user);
-    return await backend.add_next_of_kin(userPrincipal, nextOfKin);
-};
-
-export const getNextOfKin = async (user: string) => {
-    const userPrincipal = Principal.fromText(user);
-    return await backend.get_next_of_kin(userPrincipal);
-};
-
-export const setUserRole = async (role: string, user: string) => {
-    const userPrincipal = Principal.fromText(user);
-    return await backend.set_user_role(userPrincipal, role);
-}
-
-export const getUserRole = async (user: string) => {
-    const userPrincipal = Principal.fromText(user);
-    return await backend.get_user_role(userPrincipal);
-};
-
-export const withdrawFunds = async (amount: number, user: string) => {
-  return await backend.request_withdrawal(BigInt(amount), user);
-};
-
-export const borrowCkbtc = async (amount: number, user: string) => {
-  return await backend.borrow_ckbtc(BigInt(amount), user);
-};
-
-export const repayCkbtc = async (amount: number, user: string) => {
-  return await backend.repay_ckbtc(BigInt(amount), user);
-};
-
-export const applyForLoan = async (amount: number, user: string) => {
-  return await backend.apply_for_loan(BigInt(amount), user);
-};
-
-export const repayLoan = async (amount: number, user: string) => {
-  return await backend.repay_loan(BigInt(amount), user);
-};
-
-export const voteOnProposal = async (proposalId: number, approve: boolean, voter: string) => {
-  return await backend.vote_on_proposal(BigInt(proposalId), approve, voter);
-};
-
-export const checkRewards = async (user: string) => {
-  return await backend.check_rewards(user);
-};
-
-export const redeemRewards = async (user: string) => {
-  return await backend.redeem_rewards(user);
-};
-
-export const stakeStableAssets = async (amount: number) => {
-  return await backend.stake_stable_assets(BigInt(amount));
-};
-
-export const collectYield = async () => {
-  return await backend.collect_yield();
-};
-
-export const getTransactions = async () => {
-  return await backend.get_transactions();
-};
-
-export const employerMatch = async (employee: string, amount: number) => {
-  return await backend.employer_match(employee, BigInt(amount));
-};
-
-export const contribute = async (user: string, amount: number) => {
-  return await backend.contribute(user, BigInt(amount));
-};
-
-export interface EmployeeDetails {
-    name: string;
-    position: string;
-    salary: number;
-    wallet_address: string;
-    email: string;
-}
-
-export interface EmployerDetails {
-    company_name: string;
-    registration_number: string;
-    wallet_address: string;
+interface SessionState {
+  principal: Principal;
+  sessionKey: Uint8Array;
+  expiresAt: bigint;
+  lastRotation: Date;
 }
 
 export interface UserDetails {
-    principal: string;
-    authenticated_at: bigint;
-    employee_details: EmployeeDetails | null;
-    employer_details: EmployerDetails | null;
+  principal: string;
+  google_id?: string;
+  ii_principal?: string;
+  employee_details?: any;
 }
 
-export const authenticateWithDetails = async (
-  principal: string,
-  employeeDetails?: any,
-  employerDetails?: any
-): Promise<UserDetails> => {
-  const result =  await backend.authenticate_with_details(
-    Principal.fromText(principal),
-    employeeDetails ? [employeeDetails] : [],
-    employerDetails ? [employerDetails] : []
-  );
+class IdentityBrokerService {
+  private sessionState: SessionState | null = null;
+  private actor: any;
 
-  return result as UserDetails;
-};
+  constructor() {
+    const host = process.env.NEXT_PUBLIC_IC_HOST || "https://ic0.app";
+    const canisterId = process.env.NEXT_PUBLIC_IDENTITY_BROKER_ID || "";
 
-export const getAuthenticatedUser = async (principal: string) => {
-    const userPrincipal = Principal.fromText(principal);
-    return await backend.get_authenticated_user(userPrincipal);
-};
+    // Create an agent
+    const agent = HttpAgent.createSync({ host });
 
-export const isAuthenticated = async (principal: string) => {
-    const userPrincipal = Principal.fromText(principal);
-    return await backend.is_authenticated(userPrincipal);
-};
+    // In development, we need to fetch the root key
+    if (process.env.NODE_ENV !== "production") {
+      agent.fetchRootKey().catch(err => {
+        console.warn("Unable to fetch root key. Check your local replica is running");
+        console.error(err);
+      });
+    }
 
-export const logout = async (principal: string) => {
-    const userPrincipal = Principal.fromText(principal);
-    return await backend.logout(userPrincipal);
-};
+    // Create an actor for your canister
+    this.actor = Actor.createActor<IdentityBrokerService>(IdentityBrokerIdl, {
+      agent,
+      canisterId,
+    });
+  }
+
+  // Enhanced Google authentication with session management
+  async authenticateWithGoogle(idToken: string): Promise<SessionState> {
+    try {
+      const response = await this.actor.authenticate_with_google(idToken);
+      
+      if ('Ok' in response) {
+        const authResponse = response.Ok;
+        this.sessionState = {
+          principal: Principal.fromText(authResponse.principal),
+          sessionKey: new Uint8Array(authResponse.session_key),
+          expiresAt: authResponse.expires_at,
+          lastRotation: new Date()
+        };
+        
+        // Store session in localStorage (with encryption)
+        this.storeSession(this.sessionState);
+        
+        // Schedule automatic rotation
+        this.scheduleSessionRotation();
+        
+        return this.sessionState;
+      } else {
+        throw this.mapBackendError(response.Err);
+      }
+    } catch (error) {
+      console.error('Google authentication failed:', error);
+      throw error;
+    }
+  }
+
+  // Session-aware canister calls
+  async makeAuthenticatedCall<T>(
+    method: string, 
+    args: any[] = []
+  ): Promise<T> {
+    if (!this.sessionState) {
+      throw new Error('No active session');
+    }
+
+    // Check if session needs rotation
+    await this.checkAndRotateSession();
+
+    try {
+      const response = await this.actor[method](
+        Array.from(this.sessionState.sessionKey),
+        ...args
+      );
+      
+      if ('Ok' in response) {
+        return response.Ok;
+      } else {
+        throw this.mapBackendError(response.Err);
+      }
+    } catch (error) {
+      // Handle session expiration
+      if (this.isSessionError(error)) {
+        this.clearSession();
+        throw new Error('Session expired, please log in again');
+      }
+      throw error;
+    }
+  }
+
+  // Automatic session rotation
+  private async checkAndRotateSession(): Promise<void> {
+    if (!this.sessionState) return;
+
+    const now = Date.now() * 1000000; // Convert to nanoseconds
+    const rotationBuffer = 5 * 60 * 1000000000; // 5 minutes in nanoseconds
+    
+    if (Number(this.sessionState.expiresAt) - now < rotationBuffer) {
+      await this.rotateSession();
+    }
+  }
+
+  private async rotateSession(): Promise<void> {
+    if (!this.sessionState) return;
+
+    try {
+      const response = await this.actor.rotate_session_key(
+        Array.from(this.sessionState.sessionKey)
+      );
+      
+      if ('Ok' in response) {
+        this.sessionState.sessionKey = new Uint8Array(response.Ok.session_key);
+        this.sessionState.expiresAt = response.Ok.expires_at;
+        this.sessionState.lastRotation = new Date();
+        
+        this.storeSession(this.sessionState);
+      }
+    } catch (error) {
+      console.error('Session rotation failed:', error);
+      // Don't throw - let the next call handle the expired session
+    }
+  }
+
+  // Enhanced error mapping
+  private mapBackendError(error: any): Error {
+    switch (error) {
+      case 'InvalidToken':
+        return new Error('Invalid Google token');
+      case 'SessionExpired':
+        return new Error('Session has expired');
+      case 'InvalidSession':
+        return new Error('Invalid session');
+      case 'UserNotFound':
+        return new Error('User not found');
+      default:
+        return new Error(`Backend error: ${error}`);
+    }
+  }
+
+  private storeSession(session: SessionState): void {
+    // Encrypt and store session data
+    const encrypted = this.encryptSession(session);
+    localStorage.setItem('identity_broker_session', encrypted);
+  }
+
+  public loadSession(): SessionState | null {
+    const stored = localStorage.getItem('identity_broker_session');
+    if (!stored) return null;
+    
+    try {
+      return this.decryptSession(stored);
+    } catch {
+      return null;
+    }
+  }
+
+  public clearSession(): void {
+    this.sessionState = null;
+    localStorage.removeItem('identity_broker_session');
+  }
+
+  private encryptSession(session: SessionState): string {
+    const payload = JSON.stringify({
+      ...session,
+      principal: session.principal.toText(),
+      sessionKey: Array.from(session.sessionKey),
+      expiresAt: session.expiresAt.toString(),
+      lastRotation: session.lastRotation.toISOString(),
+    });
+
+    const encoder = new TextEncoder();
+    const encoded = encoder.encode(payload);
+    return fromByteArray(encoded);
+  }
+
+  private decryptSession(encoded: string): SessionState {
+    const decodedBytes = toByteArray(encoded);
+    const decoder = new TextDecoder();
+    const json = decoder.decode(decodedBytes);
+
+    const data = JSON.parse(json);
+
+    return {
+      principal: Principal.fromText(data.principal),
+      sessionKey: new Uint8Array(data.sessionKey),
+      expiresAt: BigInt(data.expiresAt),
+      lastRotation: new Date(data.lastRotation),
+    };
+  }
+
+  private isSessionError(error: any): boolean {
+    return error.message?.includes('Session') || error.message?.includes('Unauthorized');
+  }
+
+  private scheduleSessionRotation(): void {
+    // Schedule rotation check every 5 minutes
+    setInterval(() => {
+      this.checkAndRotateSession();
+    }, 5 * 60 * 1000);
+  }
+}
+
+export const identityBrokerService = new IdentityBrokerService();

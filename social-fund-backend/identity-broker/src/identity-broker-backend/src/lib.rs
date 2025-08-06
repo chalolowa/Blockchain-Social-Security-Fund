@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap};
 
 use candid::{CandidType, Principal};
-use ic_cdk::{api::time, init, post_upgrade, pre_upgrade, update};
+use ic_cdk::{api::time, init, post_upgrade, pre_upgrade, query, update};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
