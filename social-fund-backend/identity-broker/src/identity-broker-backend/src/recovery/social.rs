@@ -97,4 +97,5 @@ pub fn execute_recovery(principal: Principal) {
     // 1. Reset authentication methods
     // 2. Generate new recovery options
     // 3. Notify user
+
 }

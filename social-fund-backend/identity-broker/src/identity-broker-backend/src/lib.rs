@@ -5,7 +5,7 @@ use ic_cdk::{api::time, init, post_upgrade, pre_upgrade, query, update};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::{google_verifier::verify_google_token, recovery::{multi_factor::{MultiFactorRecovery, RecoveryError}, social::SocialRecovery}, session_manager::{create_session, rotate_session, Session, SessionError}, shadow_principal::generate_shadow_principal};
+use crate::{google_verifier::verify_google_token, recovery::{multi_factor::{MultiFactorRecovery, RecoveryError, RecoveryMethod}, social::SocialRecovery}, session_manager::{create_session, rotate_session, Session, SessionError}, shadow_principal::generate_shadow_principal};
 
 mod session_manager;
 mod google_verifier;
@@ -37,6 +37,7 @@ struct State {
 
 #[derive(Serialize, Deserialize, CandidType, Clone)]
 struct UserData {
+    principal: Principal,
     google_id: Option<String>,
     ii_principal: Option<Principal>,
     linked_at: u64,
@@ -95,28 +96,52 @@ fn post_upgrade() {
 #[update]
 async fn authenticate_with_google(id_token: String) -> Result<AuthResponse, AuthError> {
     let config = STATE.with(|s| s.borrow().google_config.clone());
+    
+    // Verify Google token
     let google_user = verify_google_token(&id_token, &config).await
         .map_err(|_| AuthError::InvalidToken)?;
-    let shadow_principal = generate_shadow_principal(&google_user.id).await
-        .map_err(|_| AuthError::PrincipalError)?;
     
-    STATE.with(|s| {
-        let mut state = s.borrow_mut();
+    // Check if user already exists
+    let existing_principal = STATE.with(|s| {
+        let state = s.borrow();
+        state.google_mappings.get(&google_user.id).copied()
+    });
+    
+    let shadow_principal = if let Some(principal) = existing_principal {
+        // User exists, return existing principal
+        principal
+    } else {
+        // New user, generate shadow principal
+        let principal = generate_shadow_principal(&google_user.id).await
+            .map_err(|_| AuthError::PrincipalError)?;
         
-        // Store mapping
-        state.google_mappings.insert(google_user.id.clone(), shadow_principal);
-        
-        // Create user entry if new
-        state.users.entry(shadow_principal)
-            .or_insert_with(|| UserData {
+        // Store new user data
+        STATE.with(|s| {
+            let mut state = s.borrow_mut();
+            state.google_mappings.insert(google_user.id.clone(), principal);
+            state.users.insert(principal, UserData {
+                principal,
                 google_id: Some(google_user.id),
                 ii_principal: None,
                 linked_at: time(),
             });
-    });
+        });
+        
+        principal
+    };
     
     // Create session
     let session = create_session(shadow_principal)?;
+    
+    // Store session in state
+    STATE.with(|s| {
+        let mut state = s.borrow_mut();
+        state.sessions.insert(session.key.clone(), SessionInfo {
+            principal: shadow_principal,
+            created_at: time(),
+            expires_at: session.expires_at,
+        });
+    });
     
     Ok(AuthResponse {
         principal: shadow_principal,
@@ -166,7 +191,19 @@ impl From<Session> for SessionResponse {
 #[update]
 fn rotate_session_key(old_key: Vec<u8>) -> Result<SessionResponse, AuthError> {
     let session = validate_session(&old_key)?;
-    let new_session = rotate_session(old_key, session.principal)?;
+    let new_session = rotate_session(old_key.clone(), session.principal)?;
+    
+    // Update session in state
+    STATE.with(|s| {
+        let mut state = s.borrow_mut();
+        state.sessions.remove(&old_key);
+        state.sessions.insert(new_session.key.clone(), SessionInfo {
+            principal: session.principal,
+            created_at: time(),
+            expires_at: new_session.expires_at,
+        });
+    });
+    
     Ok(new_session.into())
 }
 
@@ -189,6 +226,15 @@ fn initiate_recovery(
     recovery::social::initiate_recovery(session.principal)
 }
 
+#[query]
+fn approve_recovery(
+    session_key: Vec<u8>,
+    principal: Principal
+) -> Result<(), RecoveryError> {
+    let session = validate_session(&session_key)?;
+    recovery::social::approve_recovery(session.principal, principal)
+}
+
 #[update]
 fn setup_multi_factor_recovery(
     session_key: Vec<u8>,
@@ -199,20 +245,41 @@ fn setup_multi_factor_recovery(
     recovery::multi_factor::setup_multi_factor_recovery(session.principal, email, phone)
 }
 
+#[update]
+fn initiate_multi_factor_recovery(
+    session_key: Vec<u8>,
+) -> Result<(), RecoveryError> {
+    let session = validate_session(&session_key)?;
+    recovery::multi_factor::initiate_mfa_recovery(session.principal, RecoveryMethod::Email)
+}
+
+#[query]
+fn complete_mfa_recovery(
+    session_key: Vec<u8>,
+    code: String
+) -> Result<(), RecoveryError> {
+    let session = validate_session(&session_key)?;
+    recovery::multi_factor::complete_mfa_recovery(session.principal, code)
+}
+
 // Helper function
 fn validate_session(session_key: &[u8]) -> Result<SessionInfo, AuthError> {
     STATE.with(|s| {
-        let state = s.borrow();
-        state.sessions.get(session_key)
+        let mut state = s.borrow_mut();
+        
+        // Get session
+        let session = state.sessions.get(session_key)
             .cloned()
-            .ok_or(AuthError::InvalidSession)
-            .and_then(|session| {
-                if session.expires_at > time() {
-                    Ok(session)
-                } else {
-                    Err(AuthError::SessionExpired)
-                }
-            })
+            .ok_or(AuthError::InvalidSession)?;
+        
+        // Check expiration
+        if session.expires_at <= time() {
+            // Remove expired session
+            state.sessions.remove(session_key);
+            return Err(AuthError::SessionExpired);
+        }
+        
+        Ok(session)
     })
 }
 
@@ -221,6 +288,31 @@ pub struct AuthResponse {
     pub principal: Principal,
     pub session_key: Vec<u8>,
     pub expires_at: u64,
+}
+
+// Add user info query endpoint
+#[query]
+fn get_user_details(session_key: Vec<u8>) -> Result<UserData, AuthError> {
+    let session = validate_session(&session_key)?;
+    
+    STATE.with(|s| {
+        let state = s.borrow();
+        if let Some(user) = state.users.get(&session.principal) {
+            Ok(user.clone())
+        } else {
+            Err(AuthError::UserNotFound)
+        }
+    })
+}
+
+// Add logout endpoint
+#[update]
+fn logout(session_key: Vec<u8>) -> Result<(), AuthError> {
+    STATE.with(|s| {
+        let mut state = s.borrow_mut();
+        state.sessions.remove(&session_key);
+    });
+    Ok(())
 }
 
 #[derive(Error, Debug, Serialize, Deserialize, CandidType, Clone)]

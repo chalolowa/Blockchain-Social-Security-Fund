@@ -14,7 +14,12 @@ export interface UserDetails {
   principal: string;
   google_id?: string;
   ii_principal?: string;
-  employee_details?: any;
+  employee_details?: {
+    name: string;
+    email: string;
+    address: string;
+    role: string;
+  };
 }
 
 class IdentityBrokerService {

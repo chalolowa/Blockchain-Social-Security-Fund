@@ -66,7 +66,7 @@ const GoogleSignInButton = ({
       console.error('Google login failed:', error);
       onError('Google login failed. Please try again.');
     },
-    flow: 'auth-code', // Changed to get authorization code instead of access token
+    flow: 'auth-code', // Get authorization code
     scope: 'openid email profile', // Request necessary scopes for ID token
   });
 

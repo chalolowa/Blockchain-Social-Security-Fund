@@ -10,7 +10,7 @@ pub enum PrincipalError {
     #[error("Public key generation failed")]
     KeyGenerationFailed,
     #[error("Invalid input data")]
-    InvalidInput,
+    InvalidInput
 }
 
 pub async fn generate_shadow_principal(google_id: &str) -> Result<Principal, PrincipalError> {
