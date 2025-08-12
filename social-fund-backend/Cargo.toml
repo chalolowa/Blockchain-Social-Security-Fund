@@ -1,0 +1,18 @@
+[workspace]
+resolver = "2"
+
+members = [
+    "fund-core/src/fund-core-backend",
+    "identity-broker/src/identity-broker-backend", 
+    "token-factory/src/token-factory-backend",
+    "wallet-factory/src/wallet-factory-backend",
+    "watchdog/src/watchdog_backend"
+]
+
+[workspace.dependencies]
+candid = "0.10"
+ic-cdk = "0.13"
+ic-cdk-timers = "0.7"
+getrandom = { version = "0.3", features = ["wasm_js"]}
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
