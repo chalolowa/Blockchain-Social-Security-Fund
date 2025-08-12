@@ -1,35 +1,36 @@
 {
   "canisters": {
-    "internet_identity": {
-      "candid": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did",
-      "frontend": {},
-      "remote": {
-        "id": {
-          "ic": "rdmx6-jaaaa-aaaaa-aaadq-cai"
-        }
-      },
-      "type": "custom",
-      "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm.gz"
+    "fund_core": {
+      "candid": "fund-core/src/fund-core-backend/fund_core.did",
+      "package": "fund-core-backend",
+      "type": "rust"
     },
-    "social-fund-backend-backend": {
-      "candid": "src/social-fund-backend-backend/social-fund-backend-backend.did",
-      "package": "social-fund-backend-backend",
+    "identity_broker": {
+      "candid": "identity-broker/src/identity-broker-backend/identity_broker.did",
+      "package": "identity-broker-backend",
+      "type": "rust"
+    },
+    "token_factory": {
+      "candid": "token-factory/src/token-factory-backend/token_factory.did",
+      "package": "token-factory-backend",
+      "type": "rust"
+    },
+    "wallet_factory": {
+      "candid": "wallet-factory/src/wallet-factory-backend/wallet_factory.did",
+      "package": "wallet-factory-backend",
+      "type": "rust"
+    },
+    "watchdog": {
+      "candid": "watchdog/src/watchdog_backend/watchdog.did",
+      "package": "watchdog_backend",
       "type": "rust"
     }
   },
   "defaults": {
-    "bitcoin": {
-      "enabled": true,
-      "log_level": "info",
-      "nodes": [
-        "127.0.0.1:18444"
-      ]
-    },
     "build": {
       "args": "",
       "packtool": ""
     }
   },
-  "output_env_file": ".env",
   "version": 1
 }

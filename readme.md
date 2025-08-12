@@ -36,37 +36,6 @@ This project aims to revolutionize social security by leveraging blockchain tech
 ---
 
 
-
-## Security Enhancements
-
-1. Multi-Layered Authentication
-
-```
-sequenceDiagram
-    User->>NFID: Initiate Auth
-    NFID->>ICP: Request Delegation
-    ICP->>Backend: Verify Principal
-    Backend->>User: Session Token + 2FA
-```
-
-2. Fund Protection Mechanisms
-
-- Regular Audits: On-chain verification of fund balances
-
----
-
-## Environment Variables
-
-### Frontend
-
-NEXT_PUBLIC_CANISTER_ID=your_canister_id
-
-NEXT_PUBLIC_IC_HOST=<https://ic0.app>
-
-### Backend
-
-FUND_THRESHOLD=100000000  # 1 BTC equivalent
-
 MAX_LOAN_RATIO=150        # 150% collateralization
 
 ---

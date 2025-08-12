@@ -1,0 +1,17 @@
+{
+  "canisters": {
+    "fund-core-backend": {
+      "candid": "src/fund-core-backend/fund-core-backend.did",
+      "package": "fund-core-backend",
+      "type": "rust"
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}

@@ -1,0 +1,5 @@
+[workspace]
+members = [
+    "src/identity-broker-backend"
+]
+resolver = "2"
