@@ -4,57 +4,19 @@ import { motion } from "framer-motion";
 import { CheckCircleIcon, LockClosedIcon, CurrencyDollarIcon, UserGroupIcon } from "@heroicons/react/24/solid";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { useAuth } from "@nfid/identitykit/react";
-import { authenticateWithDetails, getAuthenticatedUser, isAuthenticated, UserDetails } from "@/services/icpService";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 export default function About() {
   const router = useRouter();
-  const {connect, user} = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    const checkUser = async () => {
-      if (!user?.principal) return;
-
-      try {
-        const princText = user.principal.toText();
-        const authed = await isAuthenticated(princText);
-
-        if (authed) {
-          const details = await getAuthenticatedUser(princText) as UserDetails;
-          // if employee_details exists => employee dashboard
-          if (details?.employee_details) {
-            router.replace("/employee");
-          } else {
-            // no employee record => employer dashboard (onboarding)
-            router.replace("/employer");
-          }
-        } else {
-          // never seen before => send to employer onboarding
-          router.replace("/employer");
-        }
-      } catch (err) {
-        console.error("Auth check error:", err);
-        toast.error("Failed to verify authentication");
-      }
-    };
-
-    checkUser();
-  }, [user, router]);
 
   const handleConnect = async () => {
     setIsLoading(true);
     try {
-      // trigger NFID popup if not connected
-      if (!user) {
-        await connect();
-        return;
-      }
-      // already connected, effect above will run
+      router.push("/");
     } catch (err) {
-      console.error("NFID connect failed:", err);
-      toast.error("Connection failed. Try again.");
+      console.error("Navigation failed:", err);
+      toast.error("Navigation failed. Try again.");
     } finally {
       setIsLoading(false);
     }
@@ -156,8 +118,9 @@ export default function About() {
               whileTap={{ scale: 0.95 }}
               className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-xl text-lg font-semibold transition-all"
               onClick={handleConnect}
+              disabled={isLoading}
             >
-              Start Securing Your Future Today
+              {isLoading ? "Loading..." : "Start Securing Your Future Today"}
             </motion.button>
           </div>
         </motion.div>
