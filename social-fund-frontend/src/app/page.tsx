@@ -290,9 +290,6 @@ export default function Home() {
               />
               
               <div className="relative my-4">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300"></div>
-                </div>
                 <div className="relative flex justify-center text-sm">
                   <span className="px-2 bg-transparent text-gray-300">or</span>
                 </div>
@@ -304,7 +301,7 @@ export default function Home() {
                 className="bg-gray-800 hover:bg-gray-700 text-white px-6 py-3 rounded-xl text-lg font-semibold transition-all"
                 onClick={() => setShowAuthOptions(false)}
               >
-                ← Back to main menu
+                ← Back to Home
               </motion.button>
             </motion.div>
           )}

@@ -1,27 +1,27 @@
 {
   "canisters": {
     "fund_core": {
-      "candid": "fund-core/src/fund-core-backend/fund_core.did",
+      "candid": "fund-core/src/fund-core-backend/fund-core-backend.did",
       "package": "fund-core-backend",
       "type": "rust"
     },
     "identity_broker": {
-      "candid": "identity-broker/src/identity-broker-backend/identity_broker.did",
+      "candid": "identity-broker/src/identity-broker-backend/identity-broker-backend.did",
       "package": "identity-broker-backend",
       "type": "rust"
     },
     "token_factory": {
-      "candid": "token-factory/src/token-factory-backend/token_factory.did",
+      "candid": "token-factory/src/token-factory-backend/token-factory-backend.did",
       "package": "token-factory-backend",
       "type": "rust"
     },
     "wallet_factory": {
-      "candid": "wallet-factory/src/wallet-factory-backend/wallet_factory.did",
+      "candid": "wallet-factory/src/wallet-factory-backend/wallet-factory-backend.did",
       "package": "wallet-factory-backend",
       "type": "rust"
     },
     "watchdog": {
-      "candid": "watchdog/src/watchdog_backend/watchdog.did",
+      "candid": "watchdog/src/watchdog_backend/watchdog_backend.did",
       "package": "watchdog_backend",
       "type": "rust"
     }

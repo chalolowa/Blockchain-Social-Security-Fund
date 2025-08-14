@@ -1,6 +1,6 @@
 use candid::{CandidType, Principal};
-use ic_cdk::api::time;
-use rand::{distr::Alphanumeric, Rng};
+use ic_cdk::api::{management_canister::main::raw_rand, time};
+use rand::{RngCore, SeedableRng, rngs::StdRng};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -20,10 +20,10 @@ pub enum RecoveryError {
     InvalidCode,
     #[error("No pending recovery request")]
     NoPendingRecovery,
-    #[error("Recovery is unathorized")]
+    #[error("Recovery is unauthorized")]
     Unauthorized,
     #[error("Threshold is invalid")]
-    InvalidThreshold
+    InvalidThreshold,
 }
 
 impl From<AuthError> for RecoveryError {
@@ -58,6 +58,16 @@ pub enum RecoveryMethod {
     Sms,
 }
 
+/// Get an RNG seeded from IC randomness
+async fn ic_rng() -> StdRng {
+    let (random_bytes,) = raw_rand()
+        .await
+        .expect("Failed to get IC randomness");
+    let mut seed = [0u8; 32];
+    seed.copy_from_slice(&random_bytes[..32]);
+    StdRng::from_seed(seed)
+}
+
 pub fn setup_multi_factor_recovery(
     principal: Principal,
     email: Option<String>,
@@ -66,7 +76,7 @@ pub fn setup_multi_factor_recovery(
     if email.is_none() && phone.is_none() {
         return Err(RecoveryError::InvalidConfig);
     }
-    
+
     STATE.with(|s| {
         let mut state = s.borrow_mut();
         state.recovery.multi_factor.insert(
@@ -75,43 +85,58 @@ pub fn setup_multi_factor_recovery(
                 email,
                 phone,
                 pending_recovery: None,
-            }
+            },
         );
         Ok(())
     })
 }
 
-pub fn initiate_mfa_recovery(
+pub async fn initiate_mfa_recovery(
     principal: Principal,
     method: RecoveryMethod,
 ) -> Result<(), RecoveryError> {
+    // 1) Read and clone the contact info WITHOUT holding the borrow across an await
+    let contact: String = STATE.with(|s| {
+        let state = s.borrow();
+        let recovery = state
+            .recovery
+            .multi_factor
+            .get(&principal)
+            .ok_or(RecoveryError::NotSetup)?;
+
+        let contact_opt = match &method {
+            RecoveryMethod::Email => recovery.email.as_ref(),
+            RecoveryMethod::Sms => recovery.phone.as_ref(),
+        };
+
+        contact_opt
+            .cloned()
+            .ok_or(RecoveryError::MethodNotAvailable)
+    })?;
+
+    // 2) Generate the code (async) with no STATE borrow in scope
+    let code = generate_recovery_code().await;
+    let expires_at = time() + 15 * 60 * 1_000_000_000; // 15 minutes
+
+    // 3) Write back the pending recovery (short, scoped borrow)
     STATE.with(|s| {
         let mut state = s.borrow_mut();
-        if let Some(recovery) = state.recovery.multi_factor.get_mut(&principal) {
-            let contact = match &method {
-                RecoveryMethod::Email => recovery.email.as_ref(),
-                RecoveryMethod::Sms => recovery.phone.as_ref(),
-            };
-            
-            if contact.is_none() {
-                return Err(RecoveryError::MethodNotAvailable);
-            }
-            
-            let code = generate_recovery_code();
-            recovery.pending_recovery = Some(PendingMfaRecovery {
+        if let Some(rec) = state.recovery.multi_factor.get_mut(&principal) {
+            rec.pending_recovery = Some(PendingMfaRecovery {
                 method: method.clone(),
                 code: code.clone(),
-                expires_at: time() + 15 * 60 * 1_000_000_000, // 15 minutes
+                expires_at,
             });
-            
-            // Send code to contact method (pseudo-code)
-            send_recovery_code(contact.unwrap(), &code);
-            
             Ok(())
         } else {
             Err(RecoveryError::NotSetup)
         }
-    })
+    })?;
+
+    // 4) Send the code using owned String (no lifetime headaches)
+    send_recovery_code(&contact, &code);
+
+    Ok(())
 }
 
 pub fn complete_mfa_recovery(
@@ -125,7 +150,7 @@ pub fn complete_mfa_recovery(
                 if pending.expires_at < time() {
                     return Err(RecoveryError::CodeExpired);
                 }
-                
+
                 if pending.code == code {
                     execute_recovery(principal);
                     recovery.pending_recovery = None;
@@ -142,14 +167,18 @@ pub fn complete_mfa_recovery(
     })
 }
 
-fn generate_recovery_code() -> String {
-    rand::rng()
-        .sample_iter(&Alphanumeric)
-        .take(6)
-        .map(char::from)
-        .collect()
+async fn generate_recovery_code() -> String {
+    let mut rng = ic_rng().await;
+    let mut bytes = [0u8; 3];
+    rng.fill_bytes(&mut bytes);
+    // 6-digit zero-padded numeric code
+    format!(
+        "{:06}",
+        u32::from_be_bytes([0, bytes[0], bytes[1], bytes[2]]) % 1_000_000
+    )
 }
 
 fn send_recovery_code(contact: &str, code: &str) {
-    // Implementation would integrate with email/SMS service
+    // email/SMS service integration
+    println!("Sending recovery code '{}' to '{}'", code, contact);
 }

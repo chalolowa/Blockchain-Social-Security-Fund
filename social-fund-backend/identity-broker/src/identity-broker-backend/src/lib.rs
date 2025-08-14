@@ -131,7 +131,7 @@ async fn authenticate_with_google(id_token: String) -> Result<AuthResponse, Auth
     };
     
     // Create session
-    let session = create_session(shadow_principal)?;
+    let session = create_session(shadow_principal).await?;
     
     // Store session in state
     STATE.with(|s| {
@@ -189,9 +189,9 @@ impl From<Session> for SessionResponse {
 }
 
 #[update]
-fn rotate_session_key(old_key: Vec<u8>) -> Result<SessionResponse, AuthError> {
+async fn rotate_session_key(old_key: Vec<u8>) -> Result<SessionResponse, AuthError> {
     let session = validate_session(&old_key)?;
-    let new_session = rotate_session(old_key.clone(), session.principal)?;
+    let new_session = rotate_session(old_key.clone(), session.principal).await?;
     
     // Update session in state
     STATE.with(|s| {
@@ -246,11 +246,11 @@ fn setup_multi_factor_recovery(
 }
 
 #[update]
-fn initiate_multi_factor_recovery(
+async fn initiate_multi_factor_recovery(
     session_key: Vec<u8>,
 ) -> Result<(), RecoveryError> {
     let session = validate_session(&session_key)?;
-    recovery::multi_factor::initiate_mfa_recovery(session.principal, RecoveryMethod::Email)
+    recovery::multi_factor::initiate_mfa_recovery(session.principal, RecoveryMethod::Email).await
 }
 
 #[query]
@@ -327,4 +327,9 @@ pub enum AuthError {
     UserNotFound,
     #[error("Principal generation failed")]
     PrincipalError,
+}
+
+#[query]
+fn greet(name: String) -> String {
+    format!("Hello, {}!", name)
 }

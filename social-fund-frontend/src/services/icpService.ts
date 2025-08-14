@@ -1,7 +1,7 @@
 import { Actor, HttpAgent, Identity } from "@dfinity/agent";
 import { Principal } from "@dfinity/principal";
 import { fromByteArray, toByteArray } from "base64-js"
-import { idlFactory as IdentityBrokerIdl } from "../../../social-fund-backend/identity-broker/src/declarations/identity-broker-backend/identity-broker-backend.did";
+import { idlFactory as IdentityBrokerIdl } from "../declarations/identity_broker/identity_broker.did.js";
 
 interface SessionState {
   principal: Principal;
