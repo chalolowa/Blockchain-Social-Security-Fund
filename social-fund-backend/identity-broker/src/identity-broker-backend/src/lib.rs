@@ -49,7 +49,7 @@ struct RecoveryStore {
     multi_factor: HashMap<Principal, MultiFactorRecovery>,
 }
 
-#[derive(CandidType, Serialize, Deserialize, Clone, Default)]
+#[derive(CandidType, Serialize, Deserialize, Clone, Default, Debug)]
 pub struct GoogleConfig {
     pub client_id: String,
     pub client_secret: String,
