@@ -1,0 +1,83 @@
+services:
+  nextjs:
+    build: 
+      context: .
+      target: runner
+    container_name: dssf-app
+    restart: unless-stopped
+    expose:
+      - "3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+    networks:
+      - app-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: nginx-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/certbot/www:/var/www/certbot:ro
+      - ./nginx/certbot/conf:/etc/letsencrypt:ro
+      - nginx-cache:/var/cache/nginx
+    depends_on:
+      nextjs:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - app-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  certbot:
+    image: certbot/certbot:latest
+    container_name: certbot
+    volumes:
+      - ./nginx/certbot/www:/var/www/certbot
+      - ./nginx/certbot/conf:/etc/letsencrypt
+    entrypoint: >
+      sh -c "trap exit TERM; while :; do certbot renew --webroot -w /var/www/certbot --quiet; sleep 12h & wait $${!}; done"
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - app-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  nginx-cache:
+
+networks:
+  app-network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: dssf-bridge
