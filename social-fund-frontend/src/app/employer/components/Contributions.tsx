@@ -1,15 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  contribute,
-  EmployeeDetails,
-  employerMatch,
-  getAllEmployees,
-  getAuthenticatedUser,
-  getTransactions,
-} from "@/services/icpService";
-import { useAuth } from "@nfid/identitykit/react";
 import { Banknote, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -28,7 +19,6 @@ interface Employee {
 }
 
 export function Contributions() {
-  const { user } = useAuth();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [matchEnabled, setMatchEnabled] = useState<Record<string, boolean>>({});
@@ -36,79 +26,6 @@ export function Contributions() {
   const [loading, setLoading] = useState(false);
   const [viewing, setViewing] = useState<Employee | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
-
-  useEffect(() => {
-    const fetchEmployees = async () => {
-      if (!user?.principal) return;
-
-      try {
-        const employeesList: any = await getAllEmployees();
-        setEmployees(employeesList);
-        const matchEnabledState = employeesList.reduce(
-          (acc: Record<string, boolean>, emp: EmployeeDetails) => {
-            acc[emp.wallet_address] = false;
-            return acc;
-          },
-          {}
-        );
-        setMatchEnabled(matchEnabledState);
-      } catch (error) {
-        console.error("Error fetching employees:", error);
-        toast.error("Failed to load employees");
-      }
-    };
-
-    fetchEmployees();
-  }, [user]);
-
-  const handleToggleSelect = (principal: string) => {
-    setSelected((prev) =>
-      prev.includes(principal)
-        ? prev.filter((p) => p !== principal)
-        : [...prev, principal]
-    );
-  };
-
-  const handleMatchToggle = (principal: string) => {
-    setMatchEnabled((prev) => ({
-      ...prev,
-      [principal]: !prev[principal],
-    }));
-  };
-
-  const handleContribute = async () => {
-    if (!amount || selected.length === 0) {
-      toast("Please enter an amount and select at least one employee.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      for (const principal of selected) {
-        await contribute(principal, amount);
-        if (matchEnabled[principal]) {
-          await employerMatch(principal, amount);
-        }
-      }
-
-      toast.success("Contributions processed successfully.");
-      setSelected([]);
-      setAmount(0);
-      setMatchEnabled({});
-    } catch (error) {
-      console.error("Contribution error:", error);
-      toast.error("Contribution failed.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const openDetails = async (emp: Employee) => {
-    setViewing(emp);
-    const tx: any = await getTransactions();
-    const filtered = tx.filter((t: any) => t.user === emp.principal);
-    setTransactions(filtered);
-  };
 
   return (
     <Card className="animate-fade-in">
@@ -129,7 +46,6 @@ export function Contributions() {
           </div>
           <div className="flex items-end">
             <Button
-              onClick={handleContribute}
               disabled={loading || selected.length === 0}
               className="w-full bg-emerald-600 hover:bg-emerald-700"
             >
@@ -148,7 +64,6 @@ export function Contributions() {
               <div className="flex items-center gap-4">
                 <Checkbox
                   checked={selected.includes(emp.principal)}
-                  onCheckedChange={() => handleToggleSelect(emp.principal)}
                 />
                 <div>
                   <p className="font-medium">{emp.name}</p>
@@ -162,14 +77,12 @@ export function Contributions() {
                 <Label className="text-sm text-muted-foreground">Match</Label>
                 <Checkbox
                   checked={!!matchEnabled[emp.principal]}
-                  onCheckedChange={() => handleMatchToggle(emp.principal)}
                 />
                 <Dialog>
                   <DialogTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => openDetails(emp)}
                     >
                       <Eye className="h-4 w-4" />
                     </Button>

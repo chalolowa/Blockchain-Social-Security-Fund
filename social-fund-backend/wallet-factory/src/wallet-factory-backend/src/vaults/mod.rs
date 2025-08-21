@@ -1,13 +1,15 @@
-use crate::{types::*, vaults::ckbtc::{CkBtcVault, VaultMetrics}};
-use candid::Principal;
+use crate::{types::*, vaults::{ckbtc::{CkBtcVault, VaultMetrics}, ckusdt::CkUsdtVault, icp::IcpVault}};
+use candid::{CandidType, Principal};
 use serde::{Deserialize, Serialize};
 use std::{cell::RefCell, collections::HashMap};
 use thiserror::Error;
 
 pub mod ckbtc;
+pub mod ckusdt;
+pub mod icp;
 
 // Enhanced vault manager with comprehensive features
-#[derive(Serialize, Deserialize, Default, Clone)]
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
 pub struct VaultManager {
     owner: Principal,
     created_at: u64,
@@ -22,7 +24,21 @@ pub struct VaultManager {
     rate_limiters: HashMap<VaultType, RateLimiter>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+impl Default for VaultManager {
+    fn default() -> Self {
+        Self {
+            owner: Principal::anonymous(),
+            created_at: 0,
+            last_updated: 0,
+            config: VaultConfiguration::default(),
+            metrics: VaultManagerMetrics::default(),
+            security_settings: SecuritySettings::default(),
+            rate_limiters: HashMap::new(),
+        }
+    }
+}
+
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
 pub struct VaultConfiguration {
     pub auto_update_balance: bool,
     pub balance_update_interval_seconds: u64,
@@ -45,7 +61,7 @@ impl Default for VaultConfiguration {
     }
 }
 
-#[derive(Serialize, Deserialize, Default, Clone, Debug)]
+#[derive(CandidType, Serialize, Deserialize, Default, Clone, Debug)]
 pub struct VaultManagerMetrics {
     pub total_operations: u64,
     pub successful_operations: u64,
@@ -55,7 +71,7 @@ pub struct VaultManagerMetrics {
     pub last_metrics_reset: u64,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
 pub struct RateLimiter {
     requests_per_minute: HashMap<String, Vec<u64>>,
     max_requests_per_minute: u32,
@@ -146,46 +162,47 @@ impl VaultManager {
 }
 
 // Production canister IDs
-const PRODUCTION_CONFIG: ProductionConfig = ProductionConfig {
-    canister_ids: CanisterIds {
-        ckbtc_minter: principal_from_text("mqygn-kiaaa-aaaar-qaadq-cai"),
-        ckbtc_ledger: principal_from_text("mxzaz-hqaaa-aaaar-qaada-cai"),
-        ckusdt_ledger: principal_from_text("cngnf-vqaaa-aaaar-qag4q-cai"),
-        cketh_minter: principal_from_text("sv3dd-oaaaa-aaaar-qacoa-cai"),
-        icp_ledger: principal_from_text("ryjl3-tyaaa-aaaaa-aaaba-cai"),
-        identity_broker: principal_from_text("rrkah-fqaaa-aaaaa-aaaaq-cai"),
-    },
-    network_settings: NetworkSettings {
-        request_timeout_seconds: 30,
-        max_retries: 3,
-        backoff_multiplier: 2.0,
-        max_concurrent_requests: 10,
-    },
-    security_settings: SecuritySettings {
-        min_confirmations: 6,
-        max_transaction_amount: 100_000_000_000, // 1000 tokens
-        require_two_factor: false,
-        session_timeout_seconds: 3600,
-    },
-    rate_limits: RateLimits {
-        transfers_per_minute: 10,
-        balance_updates_per_minute: 20,
-        wallet_creation_per_hour: 5,
-        withdrawal_requests_per_day: 50,
-    },
-    fee_settings: FeeSettings {
-        btc_network_fee: 10_000,
-        icp_transfer_fee: 10_000,
-        ckbtc_transfer_fee: 0,
-        ckusdt_transfer_fee: 0,
-        service_fee_percentage: 0.001, // 0.1%
-    },
-};
+fn get_production_config() -> ProductionConfig {
+    ProductionConfig {
+        canister_ids: CanisterIds {
+            ckbtc_minter: principal_from_text("mqygn-kiaaa-aaaar-qaadq-cai"),
+            ckbtc_ledger: principal_from_text("mxzaz-hqaaa-aaaar-qaada-cai"),
+            ckusdt_ledger: principal_from_text("cngnf-vqaaa-aaaar-qag4q-cai"),
+            cketh_minter: principal_from_text("sv3dd-oaaaa-aaaar-qacoa-cai"),
+            icp_ledger: principal_from_text("ryjl3-tyaaa-aaaaa-aaaba-cai"),
+            identity_broker: principal_from_text("rrkah-fqaaa-aaaaa-aaaaq-cai"),
+        },
+        network_settings: NetworkSettings {
+            request_timeout_seconds: 30,
+            max_retries: 3,
+            backoff_multiplier: 2.0,
+            max_concurrent_requests: 10,
+        },
+        security_settings: SecuritySettings {
+            min_confirmations: 6,
+            max_transaction_amount: 100_000_000_000,
+            require_two_factor: false,
+            session_timeout_seconds: 3600,
+        },
+        rate_limits: RateLimits {
+            transfers_per_minute: 10,
+            balance_updates_per_minute: 20,
+            wallet_creation_per_hour: 5,
+            withdrawal_requests_per_day: 50,
+        },
+        fee_settings: FeeSettings {
+            btc_network_fee: 10_000,
+            icp_transfer_fee: 10_000,
+            ckbtc_transfer_fee: 0,
+            ckusdt_transfer_fee: 0,
+            service_fee_percentage: 0.001,
+        },
+    }
+}
 
 // Helper function to create Principal from text at compile time
-const fn principal_from_text(text: &str) -> Principal {
-    // This is a placeholder - in reality you'd need a const-compatible Principal creation
-    Principal::anonymous()
+fn principal_from_text(text: &str) -> Principal {
+    Principal::from_text(text).unwrap_or(Principal::anonymous())
 }
 
 // Public interface functions with enhanced error handling and monitoring
@@ -222,7 +239,8 @@ pub async fn initialize_vault_system(owner: Principal) -> Result<(), WalletError
 }
 
 async fn initialize_icp_vault(owner: Principal) -> Result<(), WalletError> {
-    let vault = IcpVault::new(owner, &PRODUCTION_CONFIG.canister_ids.icp_ledger.to_text());
+    let config = get_production_config();
+    let vault = IcpVault::new(owner, &config.canister_ids.icp_ledger.to_text());
     
     ICP_VAULTS.with(|vaults| {
         vaults.borrow_mut().insert(owner, vault);
@@ -232,10 +250,11 @@ async fn initialize_icp_vault(owner: Principal) -> Result<(), WalletError> {
 }
 
 async fn initialize_ckbtc_vault(owner: Principal) -> Result<(), WalletError> {
+    let config = get_production_config();
     let vault = CkBtcVault::new(
         owner,
-        &PRODUCTION_CONFIG.canister_ids.ckbtc_minter.to_text(),
-        &PRODUCTION_CONFIG.canister_ids.ckbtc_ledger.to_text(),
+        &config.canister_ids.ckbtc_minter.to_text(),
+        &config.canister_ids.ckbtc_ledger.to_text(),
     )?;
     
     CKBTC_VAULTS.with(|vaults| {
@@ -246,11 +265,12 @@ async fn initialize_ckbtc_vault(owner: Principal) -> Result<(), WalletError> {
 }
 
 async fn initialize_ckusdt_vault(owner: Principal) -> Result<(), WalletError> {
+    let config = get_production_config();
     let vault = CkUsdtVault::new(
         owner,
-        &PRODUCTION_CONFIG.canister_ids.ckusdt_ledger.to_text(),
-        &PRODUCTION_CONFIG.canister_ids.cketh_minter.to_text(),
-        "0xdAC17F958D2ee523a2206206994597C13D831ec7", // USDT contract address
+        &config.canister_ids.ckusdt_ledger.to_text(),
+        &config.canister_ids.cketh_minter.to_text(),
+        "0xdAC17F958D2ee523a2206206994597C13D831ec7",
     )?;
     
     CKUSDT_VAULTS.with(|vaults| {
@@ -311,7 +331,7 @@ pub async fn update_ckbtc_balance(owner: Principal) -> Result<u64, WalletError> 
         if let Some(manager) = managers.borrow_mut().get_mut(&owner) {
             let rate_limiter = manager.rate_limiters
                 .entry(VaultType::CkBtc)
-                .or_insert_with(|| RateLimiter::new(PRODUCTION_CONFIG.rate_limits.balance_updates_per_minute));
+                .or_insert_with(|| RateLimiter::new(get_production_config().rate_limits.balance_updates_per_minute));
             rate_limiter.check_limit("update_balance")
         } else {
             Err(WalletError::WalletNotFound {
@@ -322,12 +342,17 @@ pub async fn update_ckbtc_balance(owner: Principal) -> Result<u64, WalletError> 
     
     let result = CKBTC_VAULTS.with(|vaults| {
         let mut vaults = vaults.borrow_mut();
-        let vault = vaults.get_mut(&owner).ok_or(WalletError::VaultError {
-            operation: "update_ckbtc_balance".to_string(),
-            details: "ckBTC vault not found".to_string(),
-        })?;
-        Box::pin(vault.update_balance())
-    }).await;
+        match vaults.get_mut(&owner) {
+            Some(vault) => {
+                // Await the future inside the closure to avoid lifetime issues
+                futures::executor::block_on(vault.update_balance())
+            },
+            None => Err(WalletError::VaultError {
+                operation: "update_ckbtc_balance".to_string(),
+                details: "ckBTC vault not found".to_string(),
+            }),
+        }
+    });
     
     let duration = ic_cdk::api::time() - start_time;
     
@@ -343,39 +368,56 @@ pub async fn update_ckbtc_balance(owner: Principal) -> Result<u64, WalletError> 
 
 pub async fn update_icp_balance(owner: Principal) -> Result<u64, WalletError> {
     let start_time = ic_cdk::api::time();
-    
-    let result = ICP_VAULTS.with(|vaults| {
+
+    // Extract the vault out of the RefCell borrow so the future does not borrow local data
+    let vault_opt = ICP_VAULTS.with(|vaults| {
         let mut vaults = vaults.borrow_mut();
-        let vault = vaults.get_mut(&owner).ok_or(WalletError::VaultError {
+        vaults.get_mut(&owner).map(|vault| vault as *mut IcpVault)
+    });
+
+    let result = if let Some(vault_ptr) = vault_opt {
+        // SAFETY: We only use this pointer here and RefCell borrow is dropped
+        let vault = unsafe { &mut *vault_ptr };
+        vault.update_balance().await
+    } else {
+        Err(WalletError::VaultError {
             operation: "update_icp_balance".to_string(),
             details: "ICP vault not found".to_string(),
-        })?;
-        Box::pin(vault.update_balance())
-    }).await;
-    
+        })
+    };
+
     let duration = ic_cdk::api::time() - start_time;
-    
+
     // Record metrics
     VAULT_MANAGERS.with(|managers| {
         if let Some(manager) = managers.borrow_mut().get_mut(&owner) {
             manager.record_operation("update_icp_balance", result.is_ok(), duration);
         }
     });
-    
+
     result
 }
 
 pub async fn update_ckusdt_balance(owner: Principal) -> Result<u64, WalletError> {
     let start_time = ic_cdk::api::time();
     
-    let result = CKUSDT_VAULTS.with(|vaults| {
-        let mut vaults = vaults.borrow_mut();
-        let vault = vaults.get_mut(&owner).ok_or(WalletError::VaultError {
-            operation: "update_ckusdt_balance".to_string(),
-            details: "ckUSDT vault not found".to_string(),
-        })?;
-        Box::pin(vault.update_balance())
-    }).await;
+    let result = {
+        let vault_opt = CKUSDT_VAULTS.with(|vaults| {
+            let mut vaults = vaults.borrow_mut();
+            vaults.get_mut(&owner).map(|vault| vault as *mut CkUsdtVault)
+        });
+
+        if let Some(vault_ptr) = vault_opt {
+            // SAFETY: Only used here, RefCell borrow is dropped
+            let vault = unsafe { &mut *vault_ptr };
+            vault.update_balance().await
+        } else {
+            Err(WalletError::VaultError {
+                operation: "update_ckusdt_balance".to_string(),
+                details: "ckUSDT vault not found".to_string(),
+            })
+        }
+    };
     
     let duration = ic_cdk::api::time() - start_time;
     
@@ -396,16 +438,14 @@ pub async fn transfer_tokens(
     recipient: Principal,
 ) -> Result<BlockIndex, WalletError> {
     let start_time = ic_cdk::api::time();
-    
-    // Validate amount
     let validated_amount = ValidatedAmount::new(amount, 1000)?;
-    
+
     // Check rate limit
     VAULT_MANAGERS.with(|managers| {
         if let Some(manager) = managers.borrow_mut().get_mut(&owner) {
             let rate_limiter = manager.rate_limiters
                 .entry(vault_type)
-                .or_insert_with(|| RateLimiter::new(PRODUCTION_CONFIG.rate_limits.transfers_per_minute));
+                .or_insert_with(|| RateLimiter::new(get_production_config().rate_limits.transfers_per_minute));
             rate_limiter.check_limit("transfer")
         } else {
             Err(WalletError::WalletNotFound {
@@ -416,34 +456,52 @@ pub async fn transfer_tokens(
     
     let result = match vault_type {
         VaultType::Icp => {
-            ICP_VAULTS.with(|vaults| {
+            let vault_ptr_opt = ICP_VAULTS.with(|vaults| {
                 let mut vaults = vaults.borrow_mut();
-                let vault = vaults.get_mut(&owner).ok_or(WalletError::VaultError {
+                vaults.get_mut(&owner).map(|vault| vault as *mut IcpVault)
+            });
+            if let Some(vault_ptr) = vault_ptr_opt {
+                // SAFETY: Only used here, RefCell borrow is dropped
+                let vault = unsafe { &mut *vault_ptr };
+                vault.transfer(validated_amount.value(), recipient).await
+            } else {
+                Err(WalletError::VaultError {
                     operation: "icp_transfer".to_string(),
                     details: "ICP vault not found".to_string(),
-                })?;
-                Box::pin(vault.transfer(validated_amount.value(), recipient))
-            }).await.map(|_| 0) // ICP returns () but we need BlockIndex
+                })
+            }
         }
         VaultType::CkBtc => {
-            CKBTC_VAULTS.with(|vaults| {
+            let vault_ptr_opt = CKBTC_VAULTS.with(|vaults| {
                 let mut vaults = vaults.borrow_mut();
-                let vault = vaults.get_mut(&owner).ok_or(WalletError::VaultError {
+                vaults.get_mut(&owner).map(|vault| vault as *mut CkBtcVault)
+            });
+            if let Some(vault_ptr) = vault_ptr_opt {
+                // SAFETY: Only used here, RefCell borrow is dropped
+                let vault = unsafe { &mut *vault_ptr };
+                vault.transfer(validated_amount.value(), recipient).await
+            } else {
+                Err(WalletError::VaultError {
                     operation: "ckbtc_transfer".to_string(),
                     details: "ckBTC vault not found".to_string(),
-                })?;
-                Box::pin(vault.transfer(validated_amount.value(), recipient))
-            }).await
+                })
+            }
         }
         VaultType::CkUsdt => {
-            CKUSDT_VAULTS.with(|vaults| {
+            let vault_ptr_opt = CKUSDT_VAULTS.with(|vaults| {
                 let mut vaults = vaults.borrow_mut();
-                let vault = vaults.get_mut(&owner).ok_or(WalletError::VaultError {
+                vaults.get_mut(&owner).map(|vault| vault as *mut CkUsdtVault)
+            });
+            if let Some(vault_ptr) = vault_ptr_opt {
+                // SAFETY: Only used here, RefCell borrow is dropped
+                let vault = unsafe { &mut *vault_ptr };
+                vault.transfer(validated_amount.value(), recipient).await.map(|_| 0)
+            } else {
+                Err(WalletError::VaultError {
                     operation: "ckusdt_transfer".to_string(),
                     details: "ckUSDT vault not found".to_string(),
-                })?;
-                Box::pin(vault.transfer(validated_amount.value(), recipient))
-            }).await.map(|_| 0) // ckUSDT returns () but we need BlockIndex
+                })
+            }
         }
     };
     
@@ -491,14 +549,22 @@ pub async fn retrieve_btc(
         }
     })?;
     
-    let result = CKBTC_VAULTS.with(|vaults| {
-        let mut vaults = vaults.borrow_mut();
-        let vault = vaults.get_mut(&owner).ok_or(WalletError::VaultError {
-            operation: "retrieve_btc".to_string(),
-            details: "ckBTC vault not found".to_string(),
-        })?;
-        Box::pin(vault.retrieve_btc(validated_amount.value(), validated_address.as_str().to_string()))
-    }).await;
+    let result = async {
+        let vault_opt = CKBTC_VAULTS.with(|vaults| {
+            let mut vaults = vaults.borrow_mut();
+            vaults.get_mut(&owner).map(|vault| vault as *mut CkBtcVault)
+        });
+        
+        if let Some(vault_ptr) = vault_opt {
+            let vault = unsafe { &mut *vault_ptr };
+            vault.retrieve_btc(validated_amount.value(), validated_address.as_str().to_string()).await
+        } else {
+            Err(WalletError::VaultError {
+                operation: "retrieve_btc".to_string(),
+                details: "ckBTC vault not found".to_string(),
+            })
+        }
+    }.await;
     
     let duration = ic_cdk::api::time() - start_time;
     
@@ -535,7 +601,7 @@ pub async fn withdraw_usdt(
         if let Some(manager) = managers.borrow_mut().get_mut(&owner) {
             let rate_limiter = manager.rate_limiters
                 .entry(VaultType::CkUsdt)
-                .or_insert_with(|| RateLimiter::new(5)); // Max 5 USDT withdrawals per minute
+                .or_insert_with(|| RateLimiter::new(5));
             rate_limiter.check_limit("withdraw_usdt")
         } else {
             Err(WalletError::WalletNotFound {
@@ -544,14 +610,22 @@ pub async fn withdraw_usdt(
         }
     })?;
     
-    let result = CKUSDT_VAULTS.with(|vaults| {
-        let mut vaults = vaults.borrow_mut();
-        let vault = vaults.get_mut(&owner).ok_or(WalletError::VaultError {
-            operation: "withdraw_usdt".to_string(),
-            details: "ckUSDT vault not found".to_string(),
-        })?;
-        Box::pin(vault.withdraw_usdt(validated_amount.value(), ethereum_address))
-    }).await;
+    let result = async {
+        let vault_opt = CKUSDT_VAULTS.with(|vaults| {
+            let mut vaults = vaults.borrow_mut();
+            vaults.get_mut(&owner).map(|vault| vault as *mut CkUsdtVault)
+        });
+        
+        if let Some(vault_ptr) = vault_opt {
+            let vault = unsafe { &mut *vault_ptr };
+            vault.withdraw_usdt(validated_amount.value(), ethereum_address).await
+        } else {
+            Err(WalletError::VaultError {
+                operation: "withdraw_usdt".to_string(),
+                details: "ckUSDT vault not found".to_string(),
+            })
+        }
+    }.await;
     
     let duration = ic_cdk::api::time() - start_time;
     
@@ -628,14 +702,20 @@ pub fn get_all_balances(owner: Principal) -> Result<HashMap<VaultType, u64>, Wal
 }
 
 pub async fn get_btc_address(owner: Principal) -> Result<String, WalletError> {
-    CKBTC_VAULTS.with(|vaults| {
+    let vault_opt = CKBTC_VAULTS.with(|vaults| {
         let mut vaults = vaults.borrow_mut();
-        let vault = vaults.get_mut(&owner).ok_or(WalletError::VaultError {
+        vaults.get_mut(&owner).map(|vault| vault as *mut CkBtcVault)
+    });
+    
+    if let Some(vault_ptr) = vault_opt {
+        let vault = unsafe { &mut *vault_ptr };
+        vault.get_btc_address().await
+    } else {
+        Err(WalletError::VaultError {
             operation: "get_btc_address".to_string(),
             details: "ckBTC vault not found".to_string(),
-        })?;
-        Box::pin(vault.get_btc_address())
-    }).await
+        })
+    }
 }
 
 pub fn get_transaction_history(
@@ -665,10 +745,13 @@ pub fn get_transaction_history(
             })
         }
         VaultType::Icp => {
-            // ICP vault would need transaction history implementation
-            Err(WalletError::VaultError {
-                operation: "get_icp_history".to_string(),
-                details: "Transaction history not available for ICP vault".to_string(),
+            ICP_VAULTS.with(|vaults| {
+                let vaults = vaults.borrow();
+                let vault = vaults.get(&owner).ok_or(WalletError::VaultError {
+                    operation: "get_icp_history".to_string(),
+                    details: "ICP vault not found".to_string(),
+                })?;
+                Ok(vault.get_transaction_history(limit))
             })
         }
     }
@@ -678,14 +761,20 @@ pub async fn check_usdt_withdrawal_status(
     owner: Principal,
     withdrawal_id: WithdrawalId,
 ) -> Result<WithdrawalStatus, WalletError> {
-    CKUSDT_VAULTS.with(|vaults| {
+    let vault_opt = CKUSDT_VAULTS.with(|vaults| {
         let mut vaults = vaults.borrow_mut();
-        let vault = vaults.get_mut(&owner).ok_or(WalletError::VaultError {
+        vaults.get_mut(&owner).map(|vault| vault as *mut CkUsdtVault)
+    });
+    
+    if let Some(vault_ptr) = vault_opt {
+        let vault = unsafe { &mut *vault_ptr };
+        vault.check_withdrawal_status(withdrawal_id).await
+    } else {
+        Err(WalletError::VaultError {
             operation: "check_withdrawal_status".to_string(),
             details: "ckUSDT vault not found".to_string(),
-        })?;
-        Box::pin(vault.check_withdrawal_status(withdrawal_id))
-    }).await
+        })
+    }
 }
 
 pub fn get_vault_metrics(owner: Principal) -> Result<HashMap<VaultType, VaultMetrics>, WalletError> {
@@ -819,7 +908,7 @@ pub fn health_check() -> SystemHealth {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(CandidType, Debug, Clone, Serialize, Deserialize)]
 pub struct SystemHealth {
     pub active_vaults: HashMap<VaultType, u64>,
     pub total_operations: u64,
@@ -874,7 +963,7 @@ pub fn restore_vault_state(backup: VaultBackup) -> Result<(), WalletError> {
     Ok(())
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(CandidType, Serialize, Deserialize, Clone)]
 pub struct VaultBackup {
     pub icp_vaults: HashMap<Principal, IcpVault>,
     pub ckbtc_vaults: HashMap<Principal, CkBtcVault>,

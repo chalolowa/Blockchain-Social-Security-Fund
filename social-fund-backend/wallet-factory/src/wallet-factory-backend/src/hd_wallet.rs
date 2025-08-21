@@ -161,7 +161,7 @@ impl HDWallet {
     }
     
     /// Derive public key only (more efficient for address generation)
-    pub fn derive_public_key(&mut self, index: u32) -> Result<Xpriv, HDWalletError> {
+    pub fn derive_public_key(&mut self, index: u32) -> Result<Xpub, HDWalletError> {
         self.validate_index(index)?;
         
         // Check cache first
@@ -192,32 +192,35 @@ impl HDWallet {
         
         let public_key = self.derive_public_key(index)?;
         let bitcoin_pubkey = PublicKey::new(public_key.public_key);
+        let compressed_pubkey = bitcoin_pubkey.inner.serialize();
         
         let address = match address_type {
             AddressType::P2PKH => {
-                Address::p2pkh(&bitcoin_pubkey, self.network)
+                Ok(Address::p2pkh(&bitcoin_pubkey, self.network))
             }
             AddressType::P2WPKH => {
-                Address::p2wpkh(&bitcoin_pubkey, self.network)
+                let compressed_pk = bitcoin::key::CompressedPublicKey::from_slice(&compressed_pubkey)
                     .map_err(|e| HDWalletError::AddressGenerationFailed {
-                        reason: format!("P2WPKH generation failed: {}", e),
-                    })?
+                        reason: format!("CompressedPublicKey conversion failed: {}", e),
+                    })?;
+                Ok(Address::p2wpkh(&compressed_pk, self.network))
             }
             AddressType::P2SH => {
                 // P2SH-wrapped P2WPKH
-                let wpkh_address = Address::p2wpkh(&bitcoin_pubkey, self.network)
+                let compressed_pk = bitcoin::key::CompressedPublicKey::from_slice(&compressed_pubkey)
                     .map_err(|e| HDWalletError::AddressGenerationFailed {
-                        reason: format!("P2WPKH generation failed: {}", e),
+                        reason: format!("CompressedPublicKey conversion failed: {}", e),
                     })?;
+                let wpkh_address = Address::p2wpkh(&compressed_pk, self.network);
                 Address::p2sh(&wpkh_address.script_pubkey(), self.network)
                     .map_err(|e| HDWalletError::AddressGenerationFailed {
-                        reason: format!("P2SH generation failed: {}", e),
-                    })?
+                        reason: format!("P2SH address generation failed: {}", e),
+                    })
             }
-        };
-        
+        }?;
+
         let address_str = address.to_string();
-        
+
         // Cache the address
         let cached_address = CachedAddress {
             address: address_str.clone(),

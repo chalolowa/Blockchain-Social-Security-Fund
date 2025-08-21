@@ -137,7 +137,7 @@ impl CircuitBreaker {
 }
 
 // Enhanced ckBTC vault with comprehensive features
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
 pub struct CkBtcVault {
     owner: Principal,
     minter_canister_id: Principal,

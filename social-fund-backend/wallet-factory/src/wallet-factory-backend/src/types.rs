@@ -228,7 +228,7 @@ pub struct ProductionConfig {
     pub fee_settings: FeeSettings,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
 pub struct CanisterIds {
     pub ckbtc_minter: Principal,
     pub ckbtc_ledger: Principal,
@@ -238,7 +238,7 @@ pub struct CanisterIds {
     pub identity_broker: Principal,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
 pub struct NetworkSettings {
     pub request_timeout_seconds: u64,
     pub max_retries: u32,
@@ -246,7 +246,7 @@ pub struct NetworkSettings {
     pub max_concurrent_requests: u32,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug, Default)]
 pub struct SecuritySettings {
     pub min_confirmations: u32,
     pub max_transaction_amount: u64,
@@ -254,7 +254,7 @@ pub struct SecuritySettings {
     pub session_timeout_seconds: u64,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
 pub struct RateLimits {
     pub transfers_per_minute: u32,
     pub balance_updates_per_minute: u32,
@@ -262,7 +262,7 @@ pub struct RateLimits {
     pub withdrawal_requests_per_day: u32,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
 pub struct FeeSettings {
     pub btc_network_fee: u64,
     pub icp_transfer_fee: u64,
@@ -284,7 +284,7 @@ pub struct Metrics {
     pub last_updated: u64,
 }
 
-#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(CandidType, Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum VaultType {
     Icp,
     CkBtc,
@@ -292,7 +292,7 @@ pub enum VaultType {
 }
 
 // Cache structures
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
 pub struct CachedBalance {
     pub value: u64,
     pub timestamp: u64,
@@ -314,7 +314,7 @@ impl CachedBalance {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(CandidType, Clone, Debug, Serialize, Deserialize)]
 pub struct CachedAddress {
     pub address: String,
     pub timestamp: u64,

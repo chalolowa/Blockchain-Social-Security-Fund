@@ -33,7 +33,7 @@ pub enum EcdsaError {
 }
 
 // Secure ECDSA configuration stored in stable memory
-#[derive(Serialize, SerdeDeserialize, Clone, Debug)]
+#[derive(CandidType, Serialize, SerdeDeserialize, Clone, Debug)]
 pub struct EcdsaConfig {
     pub key_name: String,
     pub curve: EcdsaCurve,
@@ -59,7 +59,7 @@ impl Default for EcdsaConfig {
 }
 
 // Rate limiting for ECDSA operations
-#[derive(Serialize, SerdeDeserialize, Default, Clone)]
+#[derive(CandidType, Serialize, SerdeDeserialize, Default, Clone)]
 pub struct RateLimiter {
     requests: HashMap<String, Vec<u64>>, // operation -> timestamps
     max_requests_per_minute: u32,
@@ -85,7 +85,7 @@ impl RateLimiter {
 }
 
 // Enhanced ECDSA manager with caching and security
-#[derive(Serialize, SerdeDeserialize, Default)]
+#[derive(CandidType,Serialize, SerdeDeserialize, Default, Clone)]
 pub struct EcdsaManager {
     config: EcdsaConfig,
     rate_limiter: RateLimiter,
@@ -94,7 +94,7 @@ pub struct EcdsaManager {
     request_counter: u64,
 }
 
-#[derive(Serialize, SerdeDeserialize, Clone, Debug)]
+#[derive(CandidType, Serialize, SerdeDeserialize, Clone, Debug)]
 pub struct CachedPublicKey {
     pub key: Vec<u8>,
     pub derivation_path: Vec<Vec<u8>>,
@@ -102,7 +102,7 @@ pub struct CachedPublicKey {
     pub ttl_seconds: u64,
 }
 
-#[derive(Serialize, SerdeDeserialize, Clone, Debug)]
+#[derive(CandidType, Serialize, SerdeDeserialize, Clone, Debug)]
 pub struct CachedSignature {
     pub signature: Vec<u8>,
     pub message_hash: Vec<u8>,
@@ -281,7 +281,7 @@ pub async fn sign_with_principal(principal: Principal, message: Vec<u8>) -> Resu
     let start_time = ic_cdk::api::time();
     
     match sign_with_ecdsa(args).await {
-        Ok((signature,)) => {
+        Ok((signature_response,)) => {
             let response_time = ic_cdk::api::time() - start_time;
             
             // Update metrics
@@ -292,7 +292,7 @@ pub async fn sign_with_principal(principal: Principal, message: Vec<u8>) -> Resu
             ic_cdk::println!("ECDSA sign operation completed in {}ns for principal {}", 
                 response_time, principal.to_text());
             
-            Ok(signature)
+            Ok(signature_response.signature)
         }
         Err((code, msg)) => {
             let error = EcdsaError::SigningError {
@@ -339,7 +339,7 @@ pub fn cleanup_expired_cache() -> u64 {
 
 // Backup and restore functions for upgrades
 pub fn backup_ecdsa_state() -> EcdsaManager {
-    ECDSA_MANAGER.with(|manager| Ref::<'b, EcdsaManager>::clone())
+    ECDSA_MANAGER.with(|manager| (*manager.borrow()).clone())
 }
 
 pub fn restore_ecdsa_state(state: EcdsaManager) {

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { voteOnProposal } from "@/services/icpService";
 import {
   Card,
   CardHeader,
@@ -34,26 +33,6 @@ export function Governance() {
   const [loading, setLoading] = useState(false);
   const { user } = useAuth();
   const principal = user?.principal.toText();
-
-  const handleVote = async () => {
-    if (!proposalId || voteApprove === null) {
-      toast("Please enter proposal ID and vote decision.");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      await voteOnProposal(proposalId, voteApprove, principal || "");
-      toast.success(`Vote ${voteApprove ? "approved" : "rejected"} for proposal #${proposalId}`);
-      setProposalId(0);
-      setVoteApprove(null);
-    } catch (err) {
-      console.error("Vote failed", err);
-      toast.error("Failed to record vote.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <Card className="animate-fade-in">
@@ -116,7 +95,6 @@ export function Governance() {
               </SelectContent>
             </Select>
             <Button
-              onClick={handleVote}
               disabled={loading}
               className="w-full bg-purple-600 hover:bg-purple-700"
             >

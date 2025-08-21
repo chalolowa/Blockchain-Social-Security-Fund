@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getAuthenticatedUser, addNextOfKin, getNextOfKin } from "@/services/icpService";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,35 +22,6 @@ export function Profile() {
     address: "",
     phone_number: "",
   });
-
-  useEffect(() => {
-    async function fetchUserData() {
-      try {
-        const nextOfKinDetails = await getNextOfKin(principal || "");
-        setUserDetails(nextOfKinDetails);
-
-        // Pre-fill next of kin form if it exists
-        if (nextOfKinDetails) {
-          setNextOfKin(nextOfKin);
-        }
-      } catch (err) {
-        toast.error("Please add next of kin details");
-        console.error("getNextOfKin error:", err);
-      }
-    }
-
-    fetchUserData();
-  }, []);
-
-  const handleSaveNextOfKin = async () => {
-    try {
-      await addNextOfKin(nextOfKin, principal || "");
-      toast.success("Next of kin saved successfully");
-    } catch (err) {
-      toast.error("Failed to save next of kin");
-      console.error("addNextOfKin error:", err);
-    }
-  };
 
   return (
     <Card className="animate-fade-in">
@@ -129,7 +99,7 @@ export function Profile() {
           />
         </div>
 
-        <Button onClick={handleSaveNextOfKin} className="w-full md:w-auto">
+        <Button className="w-full md:w-auto">
           <Save className="mr-2 h-4 w-4" />
           Save Beneficiary
         </Button>

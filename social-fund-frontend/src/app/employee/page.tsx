@@ -9,13 +9,10 @@ import { Funds } from "./components/Funds";
 import { Overview } from "./components/Overview";
 import { Profile } from "./components/Profile";
 import router from "next/router";
-import { logout } from "@/services/icpService";
 import { toast } from "sonner";
-import { useAuth } from "@nfid/identitykit/react";
 
 export default function EmployeeDashboard() {
   const [activeItem, setActiveItem] = useState("overview");
-  const { user } = useAuth()
 
   const sidebarItems = [
     { id: "profile", label: "Profile", icon: <User className="h-4 w-4" /> },
@@ -26,11 +23,8 @@ export default function EmployeeDashboard() {
 
   const handleLogout = async () => {
     try {
-      if (user?.principal) {
-        await logout(user.principal.toText());
-        localStorage.removeItem("userDetails");
-        router.replace("/");
-      }
+      localStorage.removeItem("userDetails");
+      router.replace("/");
     } catch (error) {
       console.error("Error logging out:", error);
       toast.error("Failed to logout");

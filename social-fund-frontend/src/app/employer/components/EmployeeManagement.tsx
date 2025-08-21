@@ -17,13 +17,8 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { toast } from "sonner";
-import { addEmployee, Employee, EmployeeDetails, getAllEmployees } from "@/services/icpService";
-import { useAuth } from "@nfid/identitykit/react";
 
 export function EmployeeManagement() {
-  const { user } = useAuth();
-  const principal = user?.principal.toText();
-  const [employees, setEmployees] = useState<Employee[]>([]);
   const [newEmployee, setNewEmployee] = useState({
     name: "",
     email: "",
@@ -31,38 +26,6 @@ export function EmployeeManagement() {
     position: "",
     salary: 0,
   });
-
-  useEffect(() => {
-    fetchEmployees();
-  }, [user])
-
-  const handleAddEmployee = async () => {
-    if (!newEmployee.name || !newEmployee.position || !newEmployee.salary) {
-      toast.error("Please fill all employee details");
-      return;
-    }
-    try {
-      await addEmployee(principal || "", newEmployee);
-      toast.success("Employee added");
-      setNewEmployee({ name: "", email: "", wallet_address: "", position: "", salary: 0 });
-      // refresh list
-      const list = await getAllEmployees();
-      setEmployees(list);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to add employee");
-    }
-  };
-
-  const fetchEmployees = async () => {
-    try {
-      const employeesList = await getAllEmployees();
-      setEmployees(employeesList as any[]);
-    } catch (error) {
-      console.error("Error fetching employees:", error);
-      toast.error("Failed to load employees");
-    }
-  };
 
   return (
     <Card className="animate-fade-in">
@@ -106,7 +69,7 @@ export function EmployeeManagement() {
             />
           </div>
         </div>
-        <Button onClick={handleAddEmployee} className="w-full md:w-auto">
+        <Button className="w-full md:w-auto">
           Add Employee
         </Button>
 
@@ -122,14 +85,6 @@ export function EmployeeManagement() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {employees.map((emp, idx) => (
-              <TableRow key={idx}>
-                <TableCell>{emp.name}</TableCell>
-                <TableCell>{emp.email}</TableCell>
-                <TableCell>{emp.position}</TableCell>
-                <TableCell>${emp.salary}</TableCell>
-              </TableRow>
-            ))}
           </TableBody>
         </Table>
       </CardContent>

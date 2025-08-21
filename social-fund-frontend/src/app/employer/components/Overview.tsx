@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getFundInfo } from "@/services/icpService";
 import { Card } from "@/components/ui/card";
 import { Wallet } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
@@ -9,19 +8,6 @@ import { toast } from "sonner";
 
 export function Overview() {
   const [fundInfo, setFundInfo] = useState<any>(null);
-
-  useEffect(() => {
-    async function fetchFund() {
-      try {
-        const data = await getFundInfo();
-        setFundInfo(data);
-      } catch (error) {
-        toast.error("Failed to fetch fund info");
-        console.error("getFundInfo error:", error);
-      }
-    }
-    fetchFund();
-  }, []);
 
   const total = (fundInfo?.ckbtc_reserve || 0) + (fundInfo?.stable_reserve || 0);
   const ckbtcPercent = total > 0 ? (fundInfo.ckbtc_reserve / total) * 100 : 0;
