@@ -4,12 +4,13 @@ import background from "../assets/homecover.jpg";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function Home() {
   const router = useRouter();
+  const navigatedRef = useRef(false);
   const { 
     isAuthenticated, 
     userPrincipal, 
@@ -43,7 +44,7 @@ export default function Home() {
   // Show session status warnings
   useEffect(() => {
     if (sessionStatus === 'expiring' && sessionExpiry) {
-      const timeLeft = Math.round((sessionExpiry.getTime() - Date.now()) / (1000 * 60));
+      const timeLeft = Math.max(0, Math.round((sessionExpiry.getTime() - Date.now()) / (1000 * 60)));
       toast.warning(`Your session expires in ${timeLeft} minutes`, {
         id: 'session-warning',
         duration: 30000,
@@ -56,6 +57,7 @@ export default function Home() {
   }, [sessionStatus, sessionExpiry]);
 
   const handlePostAuthentication = async () => {
+    if (navigatedRef.current) return;
     if (!userPrincipal || !userDetails) return;
     
     try {
@@ -65,6 +67,8 @@ export default function Home() {
         toast.info('You can optionally link your Internet Identity for additional security');
         return;
       }
+
+      navigatedRef.current = true;
 
       // Route based on user type
       if (userDetails.employee_details) {
@@ -135,7 +139,7 @@ export default function Home() {
     const getStatusText = () => {
       if (sessionStatus === 'expired') return 'Session Expired';
       
-      const timeLeft = Math.round((sessionExpiry.getTime() - Date.now()) / (1000 * 60));
+      const timeLeft = Math.max(0, Math.round((sessionExpiry.getTime() - Date.now()) / (1000 * 60)));
       return `Session: ${timeLeft}m left`;
     };
 

@@ -1,9 +1,19 @@
 "use client";
 
-import { identityBrokerService, UserDetails } from "@/services/icpService";
+import { backendICPService, UserDetails, WalletBalance, WalletInfo } from "@/services/icpService";
 import { AuthClient } from "@dfinity/auth-client";
 import { Principal } from "@dfinity/principal";
 import { createContext, useContext, ReactNode, useEffect, useState } from "react";
+import { toast } from "sonner";
+
+interface WalletState {
+  walletId: Principal | null;
+  WalletInfo: WalletInfo | null;
+  balances: WalletBalance | null;
+  btcAddress: string | null;
+  loading: boolean;
+  error: string | null;
+}
 
 interface AuthContextType {
   // Authentication state
@@ -11,12 +21,27 @@ interface AuthContextType {
   userPrincipal: Principal | null;
   userDetails: UserDetails | null;
   sessionExpiry: Date | null;
+
+  //Wallet state
+  WalletState: WalletState;
   
   // Authentication methods
   loginWithGoogle: (idToken: string) => Promise<void>;
   loginWithII: () => Promise<void>;
   linkInternetIdentity: () => Promise<void>;
   logout: () => Promise<void>;
+
+    // Profile management
+  updateEmployeeProfile: (profileData: Partial<UserDetails['employee_details']>) => Promise<void>;
+  updateEmployerProfile: (profileData: Partial<UserDetails['employer_details']>) => Promise<void>;
+  refreshUserDetails: () => Promise<void>;
+  
+  // Wallet management
+  initializeWallet: () => Promise<void>;
+  refreshWalletData: () => Promise<void>;
+  updateBalance: (vaultType: string) => Promise<void>;
+  batchUpdateBalances: () => Promise<void>;
+  transferTokens: (vaultType: string, amount: bigint, recipient: string) => Promise<void>;
   
   // State management
   loading: boolean;
@@ -35,6 +60,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [authError, setAuthError] = useState<string | null>(null);
   const [sessionStatus, setSessionStatus] = useState<'active' | 'expiring' | 'expired' | 'none'>('none');
 
+    // Wallet state
+  const [walletState, setWalletState] = useState<WalletState>({
+    walletId: null,
+    WalletInfo: null,
+    balances: null,
+    btcAddress: null,
+    loading: false,
+    error: null,
+  });
+
   // Initialize authentication
   useEffect(() => {
     const initAuth = async () => {
@@ -44,7 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAuthClient(client);
         
         // Check for existing identity broker session
-        const session = identityBrokerService.loadSession();
+        const session = backendICPService.loadSession();
         if (session) {
           setUserPrincipal(session.principal);
           setSessionExpiry(new Date(Number(session.expiresAt) / 1000000));
@@ -103,18 +138,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUserPrincipal(null);
     setUserDetails(null);
     setSessionExpiry(null);
+        setWalletState({
+        walletId: null,
+        WalletInfo: null,
+        balances: null,
+        btcAddress: null,
+        loading: false,
+        error: null,
+    });
     setAuthError("Your session has expired. Please log in again.");
   };
 
   const fetchUserDetails = async (principal: Principal) => {
     try {
-      const details = await identityBrokerService.makeAuthenticatedCall<UserDetails>(
-        'get_user_details'
-      );
+      const details = await backendICPService.getUserDetails();
       setUserDetails(details);
+      return details;
     } catch (error) {
       console.error("Failed to fetch user details:", error);
-      // Don't set error here - user might not be fully set up yet
+      throw error;
     }
   };
 
@@ -123,14 +165,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthError(null);
     
     try {
-      const session = await identityBrokerService.authenticateWithGoogle(idToken);
+      const session = await backendICPService.authenticateWithGoogle(idToken);
       setUserPrincipal(session.principal);
       setSessionExpiry(new Date(Number(session.expiresAt) / 1000000));
       await fetchUserDetails(session.principal);
-      monitorSession();
     } catch (error) {
       console.error("Google login failed:", error);
       setAuthError("Google authentication failed");
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -180,13 +222,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const iiPrincipal = identity.getPrincipal();
           
           // Link the identities
-          await identityBrokerService.makeAuthenticatedCall(
-            'link_internet_identity',
-            [iiPrincipal.toText()]
-          );
+          await backendICPService.linkInternetIdentity(iiPrincipal);
           
           // Refresh user details
           await fetchUserDetails(userPrincipal);
+          toast.success('Internet Identity linked successfully!')
           setLoading(false);
         },
       });
@@ -194,14 +234,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error("Identity linking failed:", error);
       setAuthError("Failed to link Internet Identity");
       setLoading(false);
+      throw error;
     }
   };
 
   const logout = async () => {
     setLoading(true);
     try {
-      // Clear identity broker session
-      identityBrokerService.clearSession();
+      // Clear session
+      backendICPService.clearSession();
       
       // Logout from Internet Identity if applicable
       if (authClient) {
@@ -212,6 +253,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUserDetails(null);
       setSessionExpiry(null);
       setSessionStatus('none');
+      setWalletState({
+        walletId: null,
+        WalletInfo: null,
+        balances: null,
+        btcAddress: null,
+        loading: false,
+        error: null,
+      });
+      setAuthError(null);
     } catch (error) {
       console.error("Logout failed:", error);
       setAuthError("Logout failed");
@@ -220,15 +270,177 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+    // Profile management
+  const updateEmployeeProfile = async (profileData: Partial<UserDetails['employee_details']>) => {
+    if (!userPrincipal) throw new Error('User not authenticated');
+    try {
+      await backendICPService.updateEmployeeProfile(profileData);
+      await fetchUserDetails(userPrincipal);
+      toast.success('Employee profile updated successfully!');
+    } catch (error) {
+      console.error('Failed to update employee profile:', error);
+      toast.error('Failed to update profile');
+      throw error;
+    }
+  };
+
+  const updateEmployerProfile = async (profileData: Partial<UserDetails['employer_details']>) => {
+    if (!userPrincipal) throw new Error('User not authenticated');
+    try {
+      await backendICPService.updateEmployerProfile(profileData);
+      await fetchUserDetails(userPrincipal);
+      toast.success('Employer profile updated successfully!');
+    } catch (error) {
+      console.error('Failed to update employer profile:', error);
+      toast.error('Failed to update profile');
+      throw error;
+    }
+  };
+
+  const refreshUserDetails = async () => {
+    if (!userPrincipal) throw new Error('User not authenticated');
+    try {
+      await fetchUserDetails(userPrincipal);
+    } catch (error) {
+      console.error('Failed to refresh user details:', error);
+      throw error;
+    }
+  };
+
+  // Wallet management
+  const initializeWallet = async () => {
+    if (!userPrincipal) {
+      throw new Error('User not authenticated');
+    }
+
+    setWalletState(prev => ({ ...prev, loading: true, error: null }));
+
+    try {
+      const walletId = await backendICPService.getOrCreateWallet();
+      const walletInfo = await backendICPService.getWalletInfo(walletId);
+      const balances = await backendICPService.getWalletBalances(walletId);
+      const btcAddress = await backendICPService.getBtcAddress(walletId);
+
+      setWalletState({
+        walletId,
+        WalletInfo: walletInfo,
+        balances,
+        btcAddress,
+        loading: false,
+        error: null,
+      });
+
+      toast.success('Wallet initialized successfully!');
+    } catch (error) {
+      console.error('Failed to initialize wallet:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to initialize wallet';
+      setWalletState(prev => ({ ...prev, loading: false, error: errorMessage }));
+      toast.error(errorMessage);
+      throw error;
+    }
+  };
+
+  const refreshWalletData = async () => {
+    if (!walletState.walletId) {
+      await initializeWallet();
+      return;
+    }
+
+    setWalletState(prev => ({ ...prev, loading: true, error: null }));
+
+    try {
+      const [walletInfo, balances] = await Promise.all([
+        backendICPService.getWalletInfo(walletState.walletId),
+        backendICPService.getWalletBalances(walletState.walletId),
+      ]);
+
+      setWalletState(prev => ({
+        ...prev,
+        WalletInfo: walletInfo,
+        balances,
+        loading: false,
+        error: null,
+      }));
+    } catch (error) {
+      console.error('Failed to refresh wallet data:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to refresh wallet data';
+      setWalletState(prev => ({ ...prev, loading: false, error: errorMessage }));
+      throw error;
+    }
+  };
+
+  const updateBalance = async (vaultType: string) => {
+    if (!walletState.walletId) {
+      throw new Error('Wallet not initialized');
+    }
+
+    try {
+      await backendICPService.updateBalance(walletState.walletId, vaultType);
+      await refreshWalletData();
+      toast.success(`${vaultType} balance updated successfully!`);
+    } catch (error) {
+      console.error(`Failed to update ${vaultType} balance:`, error);
+      toast.error(`Failed to update ${vaultType} balance`);
+      throw error;
+    }
+  };
+
+  const batchUpdateBalances = async () => {
+    if (!walletState.walletId) {
+      throw new Error('Wallet not initialized');
+    }
+
+    try {
+      const balances = await backendICPService.batchUpdateBalances(walletState.walletId);
+      setWalletState(prev => ({ ...prev, balances }));
+      toast.success('All balances updated successfully!');
+    } catch (error) {
+      console.error('Failed to batch update balances:', error);
+      toast.error('Failed to update balances');
+      throw error;
+    }
+  };
+
+  const transferTokens = async (vaultType: string, amount: bigint, recipient: string) => {
+    if (!walletState.walletId) {
+      throw new Error('Wallet not initialized');
+    }
+
+    try {
+      const recipientPrincipal = Principal.fromText(recipient);
+      await backendICPService.transferTokens(
+        walletState.walletId,
+        vaultType,
+        amount,
+        recipientPrincipal
+      );
+      await refreshWalletData();
+      toast.success('Transfer completed successfully!');
+    } catch (error) {
+      console.error('Transfer failed:', error);
+      toast.error('Transfer failed');
+      throw error;
+    }
+  };
+
   const value = {
     isAuthenticated: !!userPrincipal,
     userPrincipal,
     userDetails,
     sessionExpiry,
+    WalletState: walletState,
     loginWithGoogle,
     loginWithII,
     linkInternetIdentity,
     logout,
+    updateEmployeeProfile,
+    updateEmployerProfile,
+    refreshUserDetails,
+    initializeWallet,
+    refreshWalletData,
+    updateBalance,
+    batchUpdateBalances,
+    transferTokens,
     loading,
     authError,
     sessionStatus

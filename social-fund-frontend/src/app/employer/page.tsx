@@ -8,12 +8,16 @@ import { Contributions } from "./components/Contributions";
 import { EmployeeManagement } from "./components/EmployeeManagement";
 import { Governance } from "./components/Governance";
 import { Overview } from "./components/Overview";
-import router from "next/router";
 import { toast } from "sonner";
+import { EmployerProfile } from "./components/Profile";
+import { useAuth } from "@/contexts/AuthContext";
+import { useRouter } from "next/navigation";
 
 
 export default function EmployerDashboard() {
   const [activeItem, setActiveItem] = useState("overview");
+  const router = useRouter();
+  const { logout } = useAuth();
 
   const sidebarItems = [
     { id: "overview", label: "Overview", icon: <LayoutDashboard className="h-4 w-4" /> },
@@ -24,6 +28,7 @@ export default function EmployerDashboard() {
 
   const handleLogout = async () => {
     try {
+        await logout();
         localStorage.removeItem("userDetails");
         router.replace("/");
     } catch (error) {
@@ -41,6 +46,7 @@ export default function EmployerDashboard() {
           {activeItem === "employees" && <EmployeeManagement />}
           {activeItem === "contributions" && <Contributions />}
           {activeItem === "governance" && <Governance />}
+          {activeItem === "profile" && <EmployerProfile />}
         </main>
       </div>
     </LayoutWrapper>

@@ -8,11 +8,14 @@ import { User, LayoutDashboard, HandCoins, Scale } from "lucide-react";
 import { Funds } from "./components/Funds";
 import { Overview } from "./components/Overview";
 import { Profile } from "./components/Profile";
-import router from "next/router";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { useRouter } from "next/navigation";
 
 export default function EmployeeDashboard() {
   const [activeItem, setActiveItem] = useState("overview");
+  const { logout } = useAuth();
+  const router = useRouter();
 
   const sidebarItems = [
     { id: "profile", label: "Profile", icon: <User className="h-4 w-4" /> },
@@ -23,6 +26,7 @@ export default function EmployeeDashboard() {
 
   const handleLogout = async () => {
     try {
+      await logout();
       localStorage.removeItem("userDetails");
       router.replace("/");
     } catch (error) {
