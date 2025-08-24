@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { voteOnProposal } from "@/services/icpService";
 import {
   Card,
   CardContent,
@@ -18,34 +17,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Vote, ThumbsUp, ThumbsDown, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
-import { useAuth } from "@nfid/identitykit/react";
 
 export function Governance() {
   const [proposalId, setProposalId] = useState<number>(0);
   const [voteApprove, setVoteApprove] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
-  const { user } = useAuth();
-  const principal = user?.principal.toText();
-
-  const handleVote = async () => {
-    if (!proposalId || voteApprove === null) {
-      toast("Please enter proposal ID and vote decision");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      await voteOnProposal(proposalId, voteApprove, principal || "");
-      toast.success(`Vote ${voteApprove ? "approved" : "rejected"} successfully`);
-      setProposalId(0);
-      setVoteApprove(null);
-    } catch (err) {
-      toast.error("Failed to record vote");
-      console.error("voteOnProposal error:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <Card className="animate-fade-in">
@@ -77,7 +53,7 @@ export function Governance() {
             </SelectContent>
           </Select>
         </div>
-        <Button onClick={handleVote} disabled={loading} className="w-full bg-purple-600 hover:bg-purple-700">
+        <Button disabled={loading} className="w-full bg-purple-600 hover:bg-purple-700">
           {loading ? "Submitting..." : "Submit Vote"}
         </Button>
 

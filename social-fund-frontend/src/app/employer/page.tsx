@@ -8,15 +8,16 @@ import { Contributions } from "./components/Contributions";
 import { EmployeeManagement } from "./components/EmployeeManagement";
 import { Governance } from "./components/Governance";
 import { Overview } from "./components/Overview";
-import { logout } from "@/services/icpService";
-import router from "next/router";
 import { toast } from "sonner";
-import { useAuth } from "@nfid/identitykit/react";
+import { EmployerProfile } from "./components/Profile";
+import { useAuth } from "@/contexts/AuthContext";
+import { useRouter } from "next/navigation";
+
 
 export default function EmployerDashboard() {
   const [activeItem, setActiveItem] = useState("overview");
-  const { user } = useAuth();
-  const principal = user?.principal.toText();
+  const router = useRouter();
+  const { logout } = useAuth();
 
   const sidebarItems = [
     { id: "overview", label: "Overview", icon: <LayoutDashboard className="h-4 w-4" /> },
@@ -27,11 +28,9 @@ export default function EmployerDashboard() {
 
   const handleLogout = async () => {
     try {
-      if (user?.principal) {
-        await logout(principal || "");
+        await logout();
         localStorage.removeItem("userDetails");
         router.replace("/");
-      }
     } catch (error) {
       console.error("Error logging out:", error);
       toast.error("Failed to logout");
@@ -47,6 +46,7 @@ export default function EmployerDashboard() {
           {activeItem === "employees" && <EmployeeManagement />}
           {activeItem === "contributions" && <Contributions />}
           {activeItem === "governance" && <Governance />}
+          {activeItem === "profile" && <EmployerProfile />}
         </main>
       </div>
     </LayoutWrapper>

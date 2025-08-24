@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getFundInfo, checkRewards, getTransactions, redeemRewards } from "@/services/icpService";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Wallet, Gift, PieChart, Activity } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
@@ -9,48 +8,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Pie, Bar } from "react-chartjs-2";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import { useAuth } from "@nfid/identitykit/react";
 
 export function Overview() {
   const [fundInfo, setFundInfo] = useState<any>(null);
   const [rewards, setRewards] = useState<string>("0");
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
-  const principal = user?.principal.toText();
-
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const [fundData, rewardAmt, txHistory] = await Promise.all([
-          getFundInfo(),
-          checkRewards(principal || ""),
-          getTransactions(),
-        ]);
-        setFundInfo(fundData);
-        setRewards(String(rewardAmt));
-        setTransactions(txHistory as any[]);
-      } catch (error) {
-        console.error("Failed to load dashboard data", error);
-        toast.error("Failed to load dashboard data");
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchData();
-  }, []);
-
-  const handleClaimRewards = async () => {
-    try {
-      await redeemRewards(principal || "");
-      toast.success("Rewards claimed successfully");
-      const rewardAmt = await checkRewards(principal || "");
-      setRewards(String(rewardAmt));
-    } catch (error) {
-      toast.error("Failed to claim rewards");
-    }
-  };
 
   const total =
     (fundInfo?.ckbtc_reserve || 0) + (fundInfo?.stable_reserve || 0);
@@ -102,7 +65,6 @@ export function Overview() {
             </Badge>
           </div>
           <button
-            onClick={handleClaimRewards}
             className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded"
           >
             <Gift className="mr-2 inline h-4 w-4" />

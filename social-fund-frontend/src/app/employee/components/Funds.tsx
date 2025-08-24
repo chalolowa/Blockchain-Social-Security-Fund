@@ -2,17 +2,6 @@
 
 import { useState } from "react";
 import {
-  withdrawFunds,
-  borrowCkbtc,
-  repayCkbtc,
-  applyForLoan,
-  repayLoan,
-  stakeStableAssets,
-  collectYield,
-  getFundInfo,
-} from "@/services/icpService";
-
-import {
   Card,
   CardHeader,
   CardContent,
@@ -47,72 +36,6 @@ export function Funds() {
   const [stableAction, setStableAction] = useState<string>("");
   const { user } = useAuth();
   const principal = user?.principal.toText();
-
-  const handleCkbtcAction = async () => {
-    try {
-      if (!ckbtcAmount || !ckbtcAction) {
-        toast("Enter amount and select action");
-        return;
-      }
-
-      switch (ckbtcAction) {
-        case "withdraw":
-          await withdrawFunds(ckbtcAmount, principal || "");
-          toast.success("ckBTC Withdrawal successful.");
-          break;
-        case "borrow":
-          await borrowCkbtc(ckbtcAmount, principal || "");
-          toast.success("ckBTC Borrowing successful.");
-          break;
-        case "repay":
-          await repayCkbtc(ckbtcAmount, principal || "");
-          toast.success("ckBTC Repayment successful.");
-          break;
-        default:
-          toast("Invalid ckBTC action selected.");
-      }
-
-      await getFundInfo(); // Optional: update any parent state
-    } catch (error) {
-      console.error("Error in ckBTC action", error);
-      toast.error("ckBTC action failed.");
-    }
-  };
-
-  const handleStableAction = async () => {
-    try {
-      if (!stableAmount || !stableAction) {
-        toast("Enter amount and select action");
-        return;
-      }
-
-      switch (stableAction) {
-        case "apply_loan":
-          await applyForLoan(stableAmount, principal || "");
-          toast.success("Loan application submitted.");
-          break;
-        case "repay_loan":
-          await repayLoan(stableAmount, principal || "");
-          toast.success("Loan repayment complete.");
-          break;
-        case "stake":
-          await stakeStableAssets(stableAmount);
-          toast.success("Assets staked successfully.");
-          break;
-        case "collect_yield":
-          await collectYield();
-          toast.success("Yield collected.");
-          break;
-        default:
-          toast("Invalid stable reserve action selected.");
-      }
-
-      await getFundInfo(); // Optional: update any parent state
-    } catch (error) {
-      console.error("Error in stable reserve action", error);
-      toast.error("Stable reserve action failed.");
-    }
-  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in">
@@ -151,7 +74,6 @@ export function Funds() {
             </SelectContent>
           </Select>
           <Button
-            onClick={handleCkbtcAction}
             className="w-full bg-emerald-600 hover:bg-emerald-700"
           >
             Confirm ckBTC Action
@@ -198,7 +120,6 @@ export function Funds() {
             </SelectContent>
           </Select>
           <Button
-            onClick={handleStableAction}
             className="w-full bg-blue-600 hover:bg-blue-700"
           >
             Confirm Stable Action
