@@ -38,7 +38,7 @@ const EMPLOYEE_RANGES = [
   "1000+"
 ];
 
-export function EmployerProfile() {
+export function Profile() {
   const { userDetails, updateEmployerProfile, refreshUserDetails, loading } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setSaving] = useState(false);

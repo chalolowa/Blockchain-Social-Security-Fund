@@ -25,14 +25,11 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useAuth } from "@nfid/identitykit/react";
 
 export function Governance() {
   const [proposalId, setProposalId] = useState<number>(0);
   const [voteApprove, setVoteApprove] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
-  const { user } = useAuth();
-  const principal = user?.principal.toText();
 
   return (
     <Card className="animate-fade-in">

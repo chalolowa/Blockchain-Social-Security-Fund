@@ -27,15 +27,12 @@ import {
   Coins,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useAuth } from "@nfid/identitykit/react";
 
 export function Funds() {
   const [ckbtcAmount, setCkbtcAmount] = useState<number>(0);
   const [ckbtcAction, setCkbtcAction] = useState<string>("");
   const [stableAmount, setStableAmount] = useState<number>(0);
   const [stableAction, setStableAction] = useState<string>("");
-  const { user } = useAuth();
-  const principal = user?.principal.toText();
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in">

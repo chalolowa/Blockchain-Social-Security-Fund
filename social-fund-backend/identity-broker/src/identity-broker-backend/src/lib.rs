@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap};
 
 use candid::{CandidType, Principal};
-use ic_cdk::{api::time, init, post_upgrade, pre_upgrade, query, update};
+use ic_cdk::{api::time, export_candid, init, post_upgrade, pre_upgrade, query, update};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -69,7 +69,17 @@ pub struct SessionResponse {
 }
 
 #[init]
-fn init(google_config: GoogleConfig) {
+fn init(google_config: Option<GoogleConfig>) {
+    STATE.with(|s| {
+        let mut state = s.borrow_mut();
+        if let Some(config) = google_config {
+            state.google_config = config;
+        }
+    });
+}
+
+#[update]
+fn set_google_config(google_config: GoogleConfig) {
     STATE.with(|s| {
         let mut state = s.borrow_mut();
         state.google_config = google_config;
@@ -333,3 +343,5 @@ pub enum AuthError {
 fn greet(name: String) -> String {
     format!("Hello, {}!", name)
 }
+
+export_candid!();
