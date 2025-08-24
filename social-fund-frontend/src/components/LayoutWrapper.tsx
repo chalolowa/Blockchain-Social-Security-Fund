@@ -6,14 +6,29 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
   return (
     <div
       className="min-h-screen relative"
-      style={{ backgroundImage: `url(${background.src})`, backgroundPosition: "center", backgroundSize: "cover" }}
+      style={{ 
+        backgroundImage: `url(${background.src})`, 
+        backgroundPosition: "center", 
+        backgroundSize: "cover",
+        backgroundAttachment: "fixed" 
+      }}
     >
-      <div className="absolute inset-0 bg-background/10 backdrop-blur-sm" />
-      <div className="relative z-10">
-        <div className="p-4 flex justify-end">
-          <RoleSwitcher />
+      {/* Background overlay with improved gradient */}
+      <div className="absolute inset-0 bg-gradient-to-br from-background/5 via-background/10 to-background/15 backdrop-blur-sm" />
+      
+      <div className="relative z-10 min-h-screen flex flex-col">
+        {/* Header with role switcher */}
+        <header className="flex-shrink-0 p-4 flex justify-between items-center">
+          <div className="flex-1" /> {/* Spacer for mobile menu button */}
+          <div className="flex-shrink-0">
+            <RoleSwitcher />
+          </div>
+        </header>
+        
+        {/* Main content area */}
+        <div className="flex-1 flex flex-col">
+          {children}
         </div>
-        {children}
       </div>
     </div>
   );
