@@ -79,6 +79,7 @@ class ICPService {
   private identityBrokerActor: any;
   private WalletFactoryActor: any
   private agent: HttpAgent;
+  private sessionCheckInterval: NodeJS.Timeout | null = null;
 
   constructor() {
     const host = process.env.NEXT_PUBLIC_IC_HOST || "https://ic0.app";
@@ -106,6 +107,21 @@ class ICPService {
       agent: this.agent,
       canisterId: walletFactoryId
     });
+
+    this.initializeSession();
+  }
+
+  private initializeSession(): void {
+    const stored = this.loadSession();
+    if (stored && this.isSessionValid(stored)) {
+      this.sessionState = stored;
+      this.scheduleSessionRotation();
+    }
+  }
+
+  private isSessionValid(session: SessionState): boolean {
+    const now = Date.now() * 1000000; // Convert to nanoseconds
+    return Number(session.expiresAt) > now;
   }
 
   // Google authentication with session management
@@ -136,6 +152,65 @@ class ICPService {
       console.error('Google authentication failed:', error);
       throw error;
     }
+  }
+
+  // Internet Identity authentication session
+  async createSessionForII(principal: Principal): Promise<SessionState> {
+    try {
+      // Create a temporary session using the create_new_session endpoint
+      // For II, we'll create a dummy session key first
+      const tempSessionKey = new Uint8Array(32);
+      crypto.getRandomValues(tempSessionKey);
+      
+      // Store temporarily to make the call
+      const tempSession: SessionState = {
+        principal,
+        sessionKey: tempSessionKey,
+        expiresAt: BigInt(Date.now() * 1000000 + 15 * 60 * 1000000000), // 15 minutes
+        lastRotation: new Date()
+      };
+      
+      this.sessionState = tempSession;
+      
+      try {
+        // Try to create a proper session through the backend
+        const response = await this.makeAuthenticatedCall<{session_key: number[], expires_at: bigint}>(
+          'create_new_session',
+          'identityBroker'
+        );
+        
+        // Update with proper session
+        this.sessionState = {
+          principal,
+          sessionKey: new Uint8Array(response.session_key),
+          expiresAt: response.expires_at,
+          lastRotation: new Date()
+        };
+        
+        this.storeSession(this.sessionState);
+        this.scheduleSessionRotation();
+        
+        return this.sessionState;
+      } catch (error) {
+        console.warn('Backend session creation failed, using local session:', error);
+        // Keep the temporary session as fallback
+        this.storeSession(tempSession);
+        return tempSession;
+      }
+    } catch (error) {
+      console.error('Session creation failed:', error);
+      throw error;
+    }
+  }
+
+  // Check if we have an active session
+  public hasActiveSession(): boolean {
+    return this.sessionState !== null && this.isSessionValid(this.sessionState);
+  }
+
+  // Get current session
+  public getCurrentSession(): SessionState | null {
+    return this.sessionState && this.isSessionValid(this.sessionState) ? this.sessionState : null;
   }
 
   // User profile management
@@ -281,10 +356,12 @@ class ICPService {
         ...args
       );
       
-      if ('Ok' in response) {
+      if (response && 'Ok' in response) {
         return response.Ok;
-      } else {
+      } else if (response && 'Err' in response) {
         throw this.mapBackendError(response.Err);
+      } else {
+        return response;
       }
     } catch (error) {
       // Handle session expiration
@@ -359,13 +436,21 @@ class ICPService {
     }
   }
 
+  public createSession(session: SessionState): void {
+    this.sessionState = session;
+    this.storeSession(session);
+    this.scheduleSessionRotation();
+  }
+
   private storeSession(session: SessionState): void {
+    if (typeof window === "undefined") return; // SSR guard
     // Encrypt and store session data
     const encrypted = this.encryptSession(session);
     localStorage.setItem('identity_broker_session', encrypted);
   }
 
   public loadSession(): SessionState | null {
+    if (typeof window === "undefined") return null; // SSR guard
     const stored = localStorage.getItem('identity_broker_session');
     if (!stored) return null;
     
@@ -378,7 +463,16 @@ class ICPService {
 
   public clearSession(): void {
     this.sessionState = null;
-    localStorage.removeItem('identity_broker_session');
+    if (this.sessionCheckInterval) {
+      clearInterval(this.sessionCheckInterval);
+      this.sessionCheckInterval = null;
+    }
+    
+    try {
+      localStorage.removeItem('identity_broker_session');
+    } catch (error) {
+      console.error('Failed to clear session storage:', error);
+    }
   }
 
   private encryptSession(session: SessionState): string {
@@ -415,8 +509,13 @@ class ICPService {
   }
 
   private scheduleSessionRotation(): void {
+    // Clear any existing interval
+    if (this.sessionCheckInterval) {
+      clearInterval(this.sessionCheckInterval);
+    }
+
     // Schedule rotation check every 5 minutes
-    setInterval(() => {
+    this.sessionCheckInterval = setInterval(() => {
       this.checkAndRotateSession();
     }, 5 * 60 * 1000);
   }
@@ -439,6 +538,11 @@ class ICPService {
         console.error('Logout call failed:', error);
       }
     }
+    this.clearSession();
+  }
+
+  // Cleanup method
+  public destroy(): void {
     this.clearSession();
   }
 }

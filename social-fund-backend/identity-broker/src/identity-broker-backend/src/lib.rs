@@ -68,6 +68,30 @@ pub struct SessionResponse {
     pub expires_at: u64,
 }
 
+#[derive(CandidType, Serialize, Deserialize)]
+struct EmployeeProfileData {
+    name: Option<String>,
+    email: Option<String>,
+    address: Option<String>,
+    position: Option<String>,
+    department: Option<String>,
+    role: Option<String>,
+    salary: u128,
+    start_date: u64,
+}
+
+#[derive(CandidType, Serialize, Deserialize)]
+struct EmployerProfileData {
+    company_name: Option<String>,
+    company_id: Option<String>,
+    email: Option<String>,
+    address: Option<String>,
+    industry: Option<String>,
+    employee_count: u128,
+    registration_date: u64,
+    contact_person: Option<String>,
+}
+
 #[init]
 fn init(google_config: Option<GoogleConfig>) {
     STATE.with(|s| {
@@ -79,11 +103,12 @@ fn init(google_config: Option<GoogleConfig>) {
 }
 
 #[update]
-fn set_google_config(google_config: GoogleConfig) {
+fn set_google_config(google_config: GoogleConfig) -> GoogleConfig {
     STATE.with(|s| {
         let mut state = s.borrow_mut();
-        state.google_config = google_config;
+        state.google_config = google_config.clone();
     });
+    google_config
 }
 
 #[pre_upgrade]
@@ -141,7 +166,11 @@ async fn authenticate_with_google(id_token: String) -> Result<AuthResponse, Auth
     };
     
     // Create session
-    let session = create_session(shadow_principal).await?;
+    let session = create_session(shadow_principal).await
+        .map_err(|e| {
+            ic_cdk::print(&format!("Session creation failed: {:?}", e));
+            AuthError::from(e)
+        })?;
     
     // Store session in state
     STATE.with(|s| {
@@ -214,6 +243,43 @@ async fn rotate_session_key(old_key: Vec<u8>) -> Result<SessionResponse, AuthErr
         });
     });
     
+    Ok(new_session.into())
+}
+
+// session for II users
+#[update]
+async fn create_new_session(session_key: Vec<u8>) -> Result<SessionResponse, AuthError> {
+    // validate the old session
+    let session = match validate_session(&session_key) {
+        Ok(session) => session,
+        Err(_) => {
+            return Err(AuthError::InvalidSession);
+        }
+    };
+
+    let principal = session.principal;
+
+    // create a fresh session for this principal
+    let new_session = create_session(principal).await?;
+
+    // update state
+    STATE.with(|s| {
+        let mut state = s.borrow_mut();
+
+        // Remove old session
+        state.sessions.remove(&session_key);
+
+        // Insert new session
+        state.sessions.insert(
+            new_session.key.clone(),
+            SessionInfo {
+                principal,
+                created_at: time(),
+                expires_at: new_session.expires_at,
+            },
+        );
+    });
+
     Ok(new_session.into())
 }
 
@@ -307,11 +373,12 @@ fn get_user_details(session_key: Vec<u8>) -> Result<UserData, AuthError> {
     
     STATE.with(|s| {
         let state = s.borrow();
-        if let Some(user) = state.users.get(&session.principal) {
-            Ok(user.clone())
-        } else {
-            Err(AuthError::UserNotFound)
-        }
+        state.users.get(&session.principal)
+            .cloned()
+            .ok_or_else(|| {
+                ic_cdk::print(&format!("User not found for principal: {}", session.principal));
+                AuthError::UserNotFound
+            })
     })
 }
 
@@ -320,9 +387,20 @@ fn get_user_details(session_key: Vec<u8>) -> Result<UserData, AuthError> {
 fn logout(session_key: Vec<u8>) -> Result<(), AuthError> {
     STATE.with(|s| {
         let mut state = s.borrow_mut();
-        state.sessions.remove(&session_key);
+        let removed = state.sessions.remove(&session_key);
+        if removed.is_some() {
+            ic_cdk::print("Session successfully removed during logout");
+        } else {
+            ic_cdk::print("No session found to remove during logout");
+        }
     });
     Ok(())
+}
+
+// check session validity
+#[query]
+fn is_session_valid(session_key: Vec<u8>) -> bool {
+    validate_session(&session_key).is_ok()
 }
 
 #[derive(Error, Debug, Serialize, Deserialize, CandidType, Clone)]
@@ -337,11 +415,6 @@ pub enum AuthError {
     UserNotFound,
     #[error("Principal generation failed")]
     PrincipalError,
-}
-
-#[query]
-fn greet(name: String) -> String {
-    format!("Hello, {}!", name)
 }
 
 export_candid!();

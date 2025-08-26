@@ -3,6 +3,7 @@
 import { backendICPService, UserDetails, WalletBalance, WalletInfo } from "@/services/icpService";
 import { AuthClient } from "@dfinity/auth-client";
 import { Principal } from "@dfinity/principal";
+import { resolve } from "path";
 import { createContext, useContext, ReactNode, useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -79,20 +80,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAuthClient(client);
         
         // Check for existing identity broker session
-        const session = backendICPService.loadSession();
-        if (session) {
+        const session = backendICPService.getCurrentSession();
+        if (session && session.principal) {
           setUserPrincipal(session.principal);
           setSessionExpiry(new Date(Number(session.expiresAt) / 1000000));
-          await fetchUserDetails(session.principal);
-          monitorSession();
+          
+          try {
+            await fetchUserDetails(session.principal);
+            startSessionMonitoring();
+          } catch (error) {
+            console.error('Failed to fetch user details with existing session:', error);
+            // Clear invalid session
+            backendICPService.clearSession();
+            setAuthError("Session is invalid, please log in again");
+          }
         } else {
-          // Check Internet Identity
+          // Check Internet Identity as fallback
           const isAuth = await client.isAuthenticated();
           if (isAuth) {
             const identity = client.getIdentity();
             const principal = identity.getPrincipal();
-            setUserPrincipal(principal);
-            await fetchUserDetails(principal);
+            // Create session for II user
+            try {
+              const newSession = await backendICPService.createSessionForII(principal);
+              setUserPrincipal(principal);
+              setSessionExpiry(new Date(Number(newSession.expiresAt) / 1000000));
+              await fetchUserDetails(principal);
+              startSessionMonitoring();
+            } catch (error) {
+              console.error('Failed to create session for II user:', error);
+              // Still set the principal for basic II auth
+              setUserPrincipal(principal);
+              try {
+                await fetchUserDetailsDirectly(principal);
+              } catch (detailsError) {
+                console.error('Failed to fetch user details:', detailsError);
+                setAuthError("Failed to load user profile");
+              }
+            }
           }
         }
       } catch (error) {
@@ -106,8 +131,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initAuth();
   }, []);
 
-  // Monitor session status
-  const monitorSession = () => {
+  // Start monitoring session status
+  const startSessionMonitoring = () => {
     const checkSession = () => {
       if (!sessionExpiry) {
         setSessionStatus('none');
@@ -131,8 +156,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     checkSession();
     const interval = setInterval(checkSession, 30000); // Check every 30 seconds
+    
+    // Cleanup function
     return () => clearInterval(interval);
   };
+
+  // Monitor session status
+  useEffect(() => {
+    if (sessionExpiry) {
+      return startSessionMonitoring();
+    }
+  }, [sessionExpiry]);
 
   const handleSessionExpired = () => {
     setUserPrincipal(null);
@@ -146,6 +180,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading: false,
         error: null,
     });
+    backendICPService.clearSession();
     setAuthError("Your session has expired. Please log in again.");
   };
 
@@ -160,6 +195,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Fallback method for direct user details fetching (without session)
+  const fetchUserDetailsDirectly = async (principal: Principal) => {
+    const basicUser: UserDetails = {
+      principal: principal.toText(),
+    };
+    setUserDetails(basicUser);
+  };
+
   const loginWithGoogle = async (idToken: string) => {
     setLoading(true);
     setAuthError(null);
@@ -169,6 +212,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUserPrincipal(session.principal);
       setSessionExpiry(new Date(Number(session.expiresAt) / 1000000));
       await fetchUserDetails(session.principal);
+      startSessionMonitoring();
     } catch (error) {
       console.error("Google login failed:", error);
       setAuthError("Google authentication failed");
@@ -185,23 +229,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthError(null);
 
     try {
-      const identityProvider = process.env.NODE_ENV === 'production'
-        ? 'https://identity.ic0.app'
-        : `http://rdmx6-jaaaa-aaaaa-aaadq-cai.localhost:4943`;
+      const identityProvider = 'https://identity.ic0.app';
 
       await authClient.login({
         identityProvider,
         onSuccess: async () => {
           const identity = authClient.getIdentity();
           const principal = identity.getPrincipal();
+
+          const session = await backendICPService.createSessionForII(principal);
           setUserPrincipal(principal);
+          setSessionExpiry(new Date(Number(session.expiresAt) / 1000000));
+
           await fetchUserDetails(principal);
-          setLoading(false);
+          startSessionMonitoring();
+
+          resolve();
         },
       });
     } catch (error) {
       console.error("Internet Identity login failed:", error);
       setAuthError("Internet Identity login failed");
+    } finally {
       setLoading(false);
     }
   };
@@ -213,28 +262,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAuthError(null);
 
     try {
-      await authClient.login({
-        identityProvider: process.env.NODE_ENV === 'production'
-          ? 'https://identity.ic0.app'
-          : `http://rdmx6-jaaaa-aaaaa-aaadq-cai.localhost:4943`,
-        onSuccess: async () => {
-          const identity = authClient.getIdentity();
-          const iiPrincipal = identity.getPrincipal();
-          
-          // Link the identities
-          await backendICPService.linkInternetIdentity(iiPrincipal);
-          
-          // Refresh user details
-          await fetchUserDetails(userPrincipal);
-          toast.success('Internet Identity linked successfully!')
-          setLoading(false);
-        },
+      console.log('Starting Internet Identity linking...');
+      
+      await new Promise<void>((resolve, reject) => {
+        authClient.login({
+          identityProvider: 'https://identity.ic0.app',
+          onSuccess: async () => {
+            try {
+              const identity = authClient.getIdentity();
+              const iiPrincipal = identity.getPrincipal();
+              console.log('II linking successful, linking principal:', iiPrincipal.toText());
+              
+              // Link the identity
+              await backendICPService.linkInternetIdentity(iiPrincipal);
+              
+              // Refresh user details
+              await fetchUserDetails(userPrincipal);
+              toast.success('Internet Identity linked successfully!');
+              
+              console.log('Identity linking completed successfully');
+              resolve();
+            } catch (error) {
+              console.error('Identity linking failed:', error);
+              reject(error);
+            }
+          },
+          onError: (error) => {
+            console.error('II linking login failed:', error);
+            reject(new Error('Failed to authenticate with Internet Identity for linking'));
+          }
+        });
       });
     } catch (error) {
       console.error("Identity linking failed:", error);
-      setAuthError("Failed to link Internet Identity");
-      setLoading(false);
+      setAuthError(error instanceof Error ? error.message : "Failed to link Internet Identity");
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -242,7 +306,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     try {
       // Clear session
-      backendICPService.clearSession();
+      backendICPService.logout();
       
       // Logout from Internet Identity if applicable
       if (authClient) {
