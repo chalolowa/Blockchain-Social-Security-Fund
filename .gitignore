@@ -71,3 +71,4 @@ dist/
 # environment variables
 .env
 
+AUTHENTICATION_FIXES.md

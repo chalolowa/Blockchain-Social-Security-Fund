@@ -835,5 +835,11 @@ pub struct WalletInfo {
     pub usage_statistics: WalletUsageStatistics,
 }
 
-// Export the Candid interface
-ic_cdk::export_candid!();
+// Feature-gated Candid export for build-time DID generation
+#[cfg(feature = "export_candid")]
+pub mod candid_export {
+    pub fn export_candid() -> String {
+        ic_cdk::export_candid!();
+        __export_service()
+    }
+}

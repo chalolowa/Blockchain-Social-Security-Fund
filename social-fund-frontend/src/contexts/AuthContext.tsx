@@ -89,10 +89,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Check Internet Identity
           const isAuth = await client.isAuthenticated();
           if (isAuth) {
-            const identity = client.getIdentity();
+          const identity = client.getIdentity();
             const principal = identity.getPrincipal();
-            setUserPrincipal(principal);
-            await fetchUserDetails(principal);
+            // Create session for II user
+            try {
+              const newSession = await backendICPService.createSessionForII(identity);
+              setUserPrincipal(principal);
+              setSessionExpiry(new Date(Number(newSession.expiresAt) / 1000000));
+              await fetchUserDetails(principal);
+              monitorSession();
+            } catch (error) {
+              console.error('Failed to create session for II user:', error);
+              // Still set the principal for basic II auth
+              setUserPrincipal(principal);
+              try {
+                await fetchUserDetails(principal);
+              } catch (detailsError) {
+                console.error('Failed to fetch user details:', detailsError);
+                setAuthError("Failed to load user profile");
+              }
+            }
           }
         }
       } catch (error) {
@@ -194,6 +210,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         onSuccess: async () => {
           const identity = authClient.getIdentity();
           const principal = identity.getPrincipal();
+
+          const session = await backendICPService.createSessionForII(identity);
           setUserPrincipal(principal);
           await fetchUserDetails(principal);
           setLoading(false);

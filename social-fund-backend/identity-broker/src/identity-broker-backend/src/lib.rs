@@ -41,6 +41,8 @@ struct UserData {
     google_id: Option<String>,
     ii_principal: Option<Principal>,
     linked_at: u64,
+    employee_details: Option<EmployeeProfileData>,
+    employer_details: Option<EmployerProfileData>,
 }
 
 #[derive(Serialize, Deserialize, Default, CandidType, Clone)]
@@ -66,6 +68,30 @@ pub struct SessionInfo {
 pub struct SessionResponse {
     pub session_key: Vec<u8>,
     pub expires_at: u64,
+}
+
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
+pub struct EmployeeProfileData {
+    pub name: Option<String>,
+    pub email: Option<String>,
+    pub address: Option<String>,
+    pub position: Option<String>,
+    pub department: Option<String>,
+    pub role: Option<String>,
+    pub salary: u128,
+    pub start_date: u64,
+}
+
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
+pub struct EmployerProfileData {
+    pub company_name: Option<String>,
+    pub company_id: Option<String>,
+    pub email: Option<String>,
+    pub address: Option<String>,
+    pub industry: Option<String>,
+    pub employee_count: u128,
+    pub registration_date: u64,
+    pub contact_person: Option<String>,
 }
 
 #[init]
@@ -134,6 +160,8 @@ async fn authenticate_with_google(id_token: String) -> Result<AuthResponse, Auth
                 google_id: Some(google_user.id),
                 ii_principal: None,
                 linked_at: time(),
+                employee_details: None,
+                employer_details: None,
             });
         });
         
@@ -196,6 +224,49 @@ impl From<Session> for SessionResponse {
             expires_at: session.expires_at,
         }
     }
+}
+
+// Create a new session for Internet Identity callers.
+// The caller's principal becomes the user principal.
+#[update]
+async fn create_session_for_ii() -> Result<SessionResponse, AuthError> {
+    let principal = ic_cdk::caller();
+
+    // Reject anonymous callers
+    if principal == Principal::anonymous() {
+        return Err(AuthError::InvalidSession);
+    }
+
+    // Ensure user exists; if new, initialize minimal user record
+    STATE.with(|s| {
+        let mut state = s.borrow_mut();
+        state.users.entry(principal).or_insert_with(|| UserData {
+            principal,
+            google_id: None,
+            ii_principal: Some(principal),
+            linked_at: time(),
+            employee_details: None,
+            employer_details: None,
+        });
+    });
+
+    // Create session
+    let session = create_session(principal).await?;
+
+    // Persist session
+    STATE.with(|s| {
+        let mut state = s.borrow_mut();
+        state.sessions.insert(
+            session.key.clone(),
+            SessionInfo {
+                principal,
+                created_at: time(),
+                expires_at: session.expires_at,
+            },
+        );
+    });
+
+    Ok(session.into())
 }
 
 #[update]
@@ -325,6 +396,75 @@ fn logout(session_key: Vec<u8>) -> Result<(), AuthError> {
     Ok(())
 }
 
+// check session validity
+#[query]
+fn is_session_valid(session_key: Vec<u8>) -> bool {
+    validate_session(&session_key).is_ok()
+}
+
+// Profile management endpoints
+#[update]
+fn update_employee_profile(
+    session_key: Vec<u8>,
+    profile_data: EmployeeProfileData
+) -> Result<(), AuthError> {
+    let session = validate_session(&session_key)?;
+    
+    STATE.with(|s| {
+        let mut state = s.borrow_mut();
+        if let Some(user) = state.users.get_mut(&session.principal) {
+            user.employee_details = Some(profile_data);
+            // Clear employer details if setting employee profile
+            user.employer_details = None;
+            ic_cdk::print(&format!("Employee profile updated for principal: {}", session.principal));
+            Ok(())
+        } else {
+            Err(AuthError::UserNotFound)
+        }
+    })
+}
+
+#[update]
+fn update_employer_profile(
+    session_key: Vec<u8>,
+    profile_data: EmployerProfileData
+) -> Result<(), AuthError> {
+    let session = validate_session(&session_key)?;
+    
+    STATE.with(|s| {
+        let mut state = s.borrow_mut();
+        if let Some(user) = state.users.get_mut(&session.principal) {
+            user.employer_details = Some(profile_data);
+            // Clear employee details if setting employer profile
+            user.employee_details = None;
+            ic_cdk::print(&format!("Employer profile updated for principal: {}", session.principal));
+            Ok(())
+        } else {
+            Err(AuthError::UserNotFound)
+        }
+    })
+}
+
+#[query]
+fn get_user_role(session_key: Vec<u8>) -> Result<String, AuthError> {
+    let session = validate_session(&session_key)?;
+    
+    STATE.with(|s| {
+        let state = s.borrow();
+        if let Some(user) = state.users.get(&session.principal) {
+            if user.employee_details.is_some() {
+                Ok("employee".to_string())
+            } else if user.employer_details.is_some() {
+                Ok("employer".to_string())
+            } else {
+                Ok("none".to_string())
+            }
+        } else {
+            Err(AuthError::UserNotFound)
+        }
+    })
+}
+
 #[derive(Error, Debug, Serialize, Deserialize, CandidType, Clone)]
 pub enum AuthError {
     #[error("Invalid Google token")]
@@ -339,9 +479,12 @@ pub enum AuthError {
     PrincipalError,
 }
 
-#[query]
-fn greet(name: String) -> String {
-    format!("Hello, {}!", name)
+#[cfg(feature = "export_candid")]
+pub mod candid_export {
+    use super::*;
+    // Generate Candid at build-time only when the feature is enabled
+    pub fn export_candid() -> String {
+        ic_cdk::export_candid!();
+        __export_service()
+    }
 }
-
-export_candid!();

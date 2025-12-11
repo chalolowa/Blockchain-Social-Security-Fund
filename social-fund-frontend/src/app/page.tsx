@@ -61,7 +61,17 @@ export default function Home() {
     if (!userPrincipal || !userDetails) return;
     
     try {
-      // Check if user has linked Internet Identity
+      // Check if user has completed profile setup
+      const hasProfile = userDetails.employee_details || userDetails.employer_details;
+      
+      if (!hasProfile) {
+        // New user needs to complete onboarding
+        navigatedRef.current = true;
+        router.replace("/onboarding");
+        return;
+      }
+
+      // Check if user has linked Internet Identity (optional step)
       if (userDetails.google_id && !userDetails.ii_principal) {
         setShowLinkOptions(true);
         toast.info('You can optionally link your Internet Identity for additional security');
@@ -73,8 +83,11 @@ export default function Home() {
       // Route based on user type
       if (userDetails.employee_details) {
         router.replace("/employee");
-      } else {
+      } else if (userDetails.employer_details) {
         router.replace("/employer");
+      } else {
+        // Fallback to onboarding if somehow profile is incomplete
+        router.replace("/onboarding");
       }
     } catch (err) {
       console.error("Post-auth routing error:", err);

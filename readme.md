@@ -6,36 +6,12 @@ A decentralized social security fund built on the Internet Computer that provide
 
 ## Overview
 
-This project aims to revolutionize social security by leveraging blockchain technology. It offers:
+DSSF is a blockchain-based platform designed to simplify and enhance social security for employees in private companies. It empowers employers to enroll their workers, contribute to their social security fund, and optionally match employee contributions as a reward or incentive. The platform integrates Google Sign-In for seamless and user-friendly authentication, eliminating the complexity often associated with crypto wallet logins.
 
-1. Dual-Reserve Fund Mechanism
-- 50/50 Allocation: Contributions split between ckBTC (50%) and USD stablecoins (50%)
+Employees gain greater control over their beneficiaries and can access loans or withdraw from their ckBTC reserves during favorable market conditions. The system supports a dual-reserve strategy, offering both stablecoin (e.g., USDC) and ckBTC-based options. It also provides low-risk staking opportunities—both active and passive—on stable assets, enabling steady fund growth.
 
-- Dynamic Rebalancing: Automatic adjustment based on market conditions
+A unique role-switching feature allows users to toggle between the employer and employee dashboards, reflecting real-world dynamics where one can be both an employer and an employee.
 
-- Collateralization: 150% over-collateralization for loans
-
-  
-
-2. Hybrid Governance Model
-- Quadratic Voting: Prevent whale dominance in governance
-
-- Time-locked Proposals: Minimum 72-hour voting period
-
-- Delegated Voting: Employees can delegate voting power
-
-
-
-3. Risk Management System
-- Insurance Pool: 2% fee on all loans
-
-- Withdrawal Throttling: Tiered withdrawal limits based on fund health
-
-
-
----
-
-
-MAX_LOAN_RATIO=150        # 150% collateralization
+Finally, DSSF embraces democratic governance, where users vote on staking strategies and proposals. In return, they earn governance tokens, ensuring that the community actively shapes fund management.
 
 ---

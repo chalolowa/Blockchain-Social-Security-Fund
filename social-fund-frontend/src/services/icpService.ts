@@ -111,7 +111,7 @@ class ICPService {
   // Google authentication with session management
   async authenticateWithGoogle(idToken: string): Promise<SessionState> {
     try {
-      const response = await this.identityBrokerActor.authenticate_with_google(idToken);
+      const response = await this.identityBrokerActor.authenticate_with_google(idToken) as { Ok?: any; Err?: any };
       
       if ('Ok' in response) {
         const authResponse = response.Ok;
@@ -136,6 +136,57 @@ class ICPService {
       console.error('Google authentication failed:', error);
       throw error;
     }
+  }
+
+  // Internet Identity authentication session (uses caller identity)
+  async createSessionForII(identity: Identity): Promise<SessionState> {
+    try {
+      // Build a temporary agent bound to II identity just for session creation
+      const host = process.env.NEXT_PUBLIC_IC_HOST || "https://ic0.app";
+      const identityBrokerId = process.env.NEXT_PUBLIC_IDENTITY_BROKER_ID || "";
+
+      const agent = await HttpAgent.create({ host, identity });
+      if (process.env.NODE_ENV !== "production") {
+        try { await agent.fetchRootKey(); } catch {}
+      }
+
+      const actor = Actor.createActor(IdentityBrokerIdl, {
+        agent,
+        canisterId: identityBrokerId,
+      });
+
+      // Call the backend to create a real session bound to the caller principal
+      const response = await actor.create_session_for_ii() as { Ok?: any; Err?: any };
+
+      if ('Ok' in response) {
+        const principal = identity.getPrincipal();
+        const sess = response.Ok;
+        this.sessionState = {
+          principal,
+          sessionKey: new Uint8Array(sess.session_key),
+          expiresAt: sess.expires_at,
+          lastRotation: new Date(),
+        };
+        this.storeSession(this.sessionState);
+        this.scheduleSessionRotation();
+        return this.sessionState;
+      }
+
+      throw this.mapBackendError(response.Err);
+    } catch (error) {
+      console.error('Session creation failed:', error);
+      throw error;
+    }
+  }
+
+  // Check if we have an active session
+  public hasActiveSession(): boolean {
+    return this.sessionState !== null && this.isSessionValid(this.sessionState);
+  }
+
+  // Get current session
+  public getCurrentSession(): SessionState | null {
+    return this.sessionState && this.isSessionValid(this.sessionState) ? this.sessionState : null;
   }
 
   // User profile management
@@ -279,10 +330,10 @@ class ICPService {
       const response = await actor[method](
         Array.from(this.sessionState.sessionKey),
         ...args
-      );
+      ) as { Ok?: T; Err?: any };
       
       if ('Ok' in response) {
-        return response.Ok;
+        return response.Ok as T;
       } else {
         throw this.mapBackendError(response.Err);
       }
@@ -314,7 +365,7 @@ class ICPService {
     try {
       const response = await this.identityBrokerActor.rotate_session_key(
         Array.from(this.sessionState.sessionKey)
-      );
+      ) as { Ok?: any; Err?: any };
       
       if ('Ok' in response) {
         this.sessionState.sessionKey = new Uint8Array(response.Ok.session_key);
@@ -408,6 +459,11 @@ class ICPService {
       expiresAt: BigInt(data.expiresAt),
       lastRotation: new Date(data.lastRotation),
     };
+  }
+
+  private isSessionValid(session: SessionState): boolean {
+    const now = Date.now() * 1000000; // Convert to nanoseconds
+    return Number(session.expiresAt) > now;
   }
 
   private isSessionError(error: any): boolean {

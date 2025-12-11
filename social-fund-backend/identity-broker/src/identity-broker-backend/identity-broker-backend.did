@@ -1,5 +1,84 @@
+type AuthError = variant {
+  InvalidToken;
+  SessionExpired;
+  InvalidSession;
+  UserNotFound;
+  PrincipalError
+};
+
+type AuthResponse = record {
+  principal : principal;
+  session_key : vec nat8;
+  expires_at : nat64
+};
+
+type EmployeeProfileData = record {
+  name : opt text;
+  email : opt text;
+  address : opt text;
+  position : opt text;
+  department : opt text;
+  role : opt text;
+  salary : nat;
+  start_date : nat64
+};
+
+type EmployerProfileData = record {
+  company_name : opt text;
+  company_id : opt text;
+  email : opt text;
+  address : opt text;
+  industry : opt text;
+  employee_count : nat;
+  registration_date : nat64;
+  contact_person : opt text
+};
+
+type GoogleConfig = record {
+  client_id : text;
+  client_secret : text
+};
+
+type RecoveryError = variant {
+  NotSetup;
+  AlreadyInProgress;
+  NotInProgress;
+  Unauthorized;
+  InsufficientApprovals;
+  InvalidThreshold
+};
+
+type SessionResponse = record {
+  session_key : vec nat8;
+  expires_at : nat64
+};
+
+type UserData = record {
+  principal : principal;
+  google_id : opt text;
+  ii_principal : opt principal;
+  linked_at : nat64;
+  employee_details : opt EmployeeProfileData;
+  employer_details : opt EmployerProfileData
+};
+
 service : {
-    "greet": (text) -> (text) query;
+  authenticate_with_google : (text) -> (variant { Ok: AuthResponse; Err: AuthError });
+  rotate_session_key : (vec nat8) -> (variant { Ok: SessionResponse; Err: AuthError });
+  create_new_session : (vec nat8) -> (variant { Ok: SessionResponse; Err: AuthError });
+  logout : (vec nat8) -> (variant { Ok: null; Err: AuthError });
+  is_session_valid : (vec nat8) -> (bool) query;
+  get_user_details : (vec nat8) -> (variant { Ok: UserData; Err: AuthError }) query;
+  link_internet_identity : (vec nat8, principal) -> (variant { Ok: null; Err: AuthError });
+  update_employee_profile : (vec nat8, EmployeeProfileData) -> (variant { Ok: null; Err: AuthError });
+  update_employer_profile : (vec nat8, EmployerProfileData) -> (variant { Ok: null; Err: AuthError });
+  get_user_role : (vec nat8) -> (variant { Ok: text; Err: AuthError }) query;
+  setup_social_recovery : (vec nat8, vec principal, nat8) -> (variant { Ok: null; Err: RecoveryError });
+  initiate_recovery : (vec nat8) -> (variant { Ok: null; Err: RecoveryError });
+  approve_recovery : (vec nat8, principal) -> (variant { Ok: null; Err: RecoveryError }) query;
+  setup_multi_factor_recovery : (vec nat8, opt text, opt text) -> (variant { Ok: null; Err: RecoveryError });
+  initiate_multi_factor_recovery : (vec nat8) -> (variant { Ok: null; Err: RecoveryError });
+  complete_mfa_recovery : (vec nat8, text) -> (variant { Ok: null; Err: RecoveryError }) query;
+  set_google_config : (GoogleConfig) -> (GoogleConfig);
+  greet : (text) -> (text) query
 }
-
-
